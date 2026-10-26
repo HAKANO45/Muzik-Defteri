@@ -1,5 +1,11 @@
 # Yol haritası
 
+## v4.0.2 — tamam
+- iPhone: yeni (boş) klasör uygulama kapanınca kayboluyordu → artık IndexedDB'de saklanıyor; boş klasör silinebilir
+- ZIP/klasör içe aktarırken üst klasör atılıyordu ("2.Slov Fantazi Tsm.zip" içeriği köke dağılıyordu) → klasör korunuyor; sadece "Repertuar…" kökü veya zaten içinde bulunulan klasör atlanır
+- Windows ZIP'lerindeki Türkçe adlar (ı → "�") düzeltildi: Unicode Path (0x7075) alanı okunuyor
+- Uygulama yeniden açılınca son klasör/sekme/program hatırlanıyor
+
 ## v4.0.0 — tamam
 - PWA (Windows / iPad / iPhone), çevrimdışı, IndexedDB
 - Kütüphane, Türkçe duyarsız arama (başlık + söz + tam ifade), usul/makam etiketleri

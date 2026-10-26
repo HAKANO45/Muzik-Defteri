@@ -6,7 +6,7 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '4.0.1';
+export const VERSION = '4.0.2';
 const $ = id => document.getElementById(id);
 
 // ------------------------------------------------------------------ durum
@@ -197,7 +197,10 @@ function renderList() {
     const ctx = { list: node.files, label: S.dir || t('root') };
     for (const p of node.files.slice(0, S.limit)) list.append(songItem(p, { ctx, sub: '' }));
     if (node.files.length > S.limit) list.append(h('button', { class: 'small-btn', style: 'margin:10px', onclick: () => { S.limit += 300; renderList(); } }, t('showMore', { n: node.files.length - S.limit })));
-    if (!dirs.length && !node.files.length) list.append(h('div', { class: 'list-note' }, S.songs.size ? '—' : t('welcomeText')));
+    if (!dirs.length && !node.files.length) {
+      list.append(h('div', { class: 'list-note' }, S.songs.size ? t('emptyFolder') : t('welcomeText')));
+      if (S.dir && S.virtualDirs.has(S.dir)) list.append(h('button', { class: 'small-btn', style: 'margin:0 12px', onclick: () => deleteEmptyFolder(S.dir) }, '🗑 ' + t('deleteFolder')));
+    }
     return;
   }
 
@@ -222,7 +225,7 @@ function renderList() {
   if (!prog) {
     head.append(h('span', { class: 'spacer' }), h('button', { class: 'small-btn', onclick: newProgram }, '＋ ' + t('newProgram')));
     for (const p of progs) {
-      list.append(h('div', { class: 'item', role: 'button', tabindex: 0, onclick: () => { S.programId = p.id; renderList(); } },
+      list.append(h('div', { class: 'item', role: 'button', tabindex: 0, onclick: () => { S.programId = p.id; saveUi(); renderList(); } },
         h('span', { class: 'ico' }, '☰'),
         h('span', { class: 'main' }, h('span', { class: 'name' }, p.name)),
         h('span', { class: 'count' }, p.items.length)));
@@ -230,7 +233,7 @@ function renderList() {
     if (!progs.length) list.append(h('div', { class: 'list-note' }, t('emptyProgram')));
     return;
   }
-  head.append(h('button', { class: 'crumb', onclick: () => { S.programId = null; renderList(); } }, '‹ ' + t('programs')),
+  head.append(h('button', { class: 'crumb', onclick: () => { S.programId = null; saveUi(); renderList(); } }, '‹ ' + t('programs')),
     h('span', { class: 'crumb-sep' }, '›'), h('b', { style: 'color:var(--gold)' }, prog.name), h('span', { class: 'spacer' }),
     h('button', { class: 'small-btn', title: t('rename'), onclick: () => renameProgram(prog) }, '✎'),
     h('button', { class: 'small-btn', title: t('delete'), onclick: () => deleteProgram(prog) }, '🗑'),
@@ -246,7 +249,24 @@ function renderList() {
   if (!prog.items.length) list.append(h('div', { class: 'list-note' }, t('emptyProgram')));
 }
 
-function goDir(d) { S.dir = d; S.tab = 'library'; S.limit = 300; $('q').value = ''; renderList(); $('list').scrollTop = 0; }
+function goDir(d) { S.dir = d; S.tab = 'library'; S.limit = 300; $('q').value = ''; saveUi(); renderList(); $('list').scrollTop = 0; }
+
+/** Kullanıcının bulunduğu yer (sekme/klasör/program) — iPhone uygulamayı kapatıp açınca aynı yerden devam. */
+function saveUi() {
+  try { localStorage.setItem('md.ui', JSON.stringify({ tab: S.tab, dir: S.dir, programId: S.programId })); } catch (_) {}
+}
+function loadUi() {
+  try {
+    const u = JSON.parse(localStorage.getItem('md.ui') || 'null');
+    if (!u) return;
+    if (['library', 'programs', 'favorites', 'recent'].includes(u.tab)) S.tab = u.tab;
+    if (typeof u.dir === 'string' && S.dirs.has(u.dir)) S.dir = u.dir;
+    if (u.programId) S.programId = u.programId;
+  } catch (_) {}
+}
+
+/** Boş (henüz şarkısı olmayan) klasörler IndexedDB'de saklanır; yoksa uygulama kapanınca kaybolur. */
+function saveVirtualDirs() { return db.set('virtualDirs', [...S.virtualDirs]); }
 
 async function newFolder() {
   const name = await promptText(t('newFolder'), '');
@@ -255,8 +275,18 @@ async function newFolder() {
   if (!clean) return;
   const d = S.dir ? S.dir + '/' + clean : clean;
   S.virtualDirs.add(d);
+  await saveVirtualDirs();
   rebuildIndex();
   goDir(d);
+}
+
+async function deleteEmptyFolder(d) {
+  if (countIn(d)) return;
+  if (!(await confirmBox(t('confirmDelete', { name: baseName(d) })))) return;
+  for (const v of [...S.virtualDirs]) if (v === d || v.startsWith(d + '/')) S.virtualDirs.delete(v);
+  await saveVirtualDirs();
+  rebuildIndex();
+  goDir(dirName(d));
 }
 
 // ------------------------------------------------------------------ şarkı görünümü
@@ -489,7 +519,7 @@ async function saveSong(oldPath, newPath, text) {
     await removeSong(oldPath);
     replacePathEverywhere(oldPath, newPath);
   }
-  S.virtualDirs.delete(dirName(newPath));
+  if (S.virtualDirs.delete(dirName(newPath))) saveVirtualDirs();
   rebuildIndex(); renderList(); updateSyncDot(); scheduleSync();
 }
 
@@ -706,9 +736,21 @@ function commonTop(names) {
   return firsts.size === 1 && names.every(n => n.includes('/')) ? [...firsts][0] + '/' : '';
 }
 
+/** ZIP/klasördeki ortak üst klasör atılsın mı? Sadece repertuvarın kendisiyse ("Repertuar KUZEY 2019",
+ *  dışa aktarılan "Repertuar/") veya kullanıcı zaten o klasörün içindeyse. Aksi halde klasör korunur:
+ *  "2.Slov Fantazi Tsm.zip" kökte içe aktarılınca "2.Slov Fantazi Tsm/…" olarak gelir. */
+function importPrefixToDrop(names) {
+  const top = commonTop(names);
+  if (!top) return '';
+  const name = top.slice(0, -1).trim();
+  if (/^repertuar/i.test(name)) return top;
+  if (S.dir && fold(name) === fold(baseName(S.dir))) return top;
+  return '';
+}
+
 async function importEntries(entries) {   // [{ name: 'klasör/dosya.txt', bytes }]
   entries = entries.filter(e => /\.txt$/i.test(e.name) && !e.name.split('/').some(x => x.startsWith('__MACOSX') || x.startsWith('.')));
-  const top = commonTop(entries.map(e => e.name));
+  const top = importPrefixToDrop(entries.map(e => e.name));
   let added = 0, same = 0;
   const puts = [];
   for (const e of entries) {
@@ -721,7 +763,11 @@ async function importEntries(entries) {   // [{ name: 'klasör/dosya.txt', bytes
     S.songs.set(p, rec); puts.push(strip(rec)); added++;
   }
   for (let i = 0; i < puts.length; i += 2000) await db.putSongs(puts.slice(i, i + 2000));
-  rebuildIndex(); renderList(); updateSyncDot();
+  rebuildIndex();
+  // içe aktarılan klasöre git, kullanıcı nereye geldiğini görsün
+  const firstDir = puts.length ? dirName(puts[0].p).split('/').slice(0, (S.dir ? S.dir.split('/').length : 0) + 1).join('/') : '';
+  if (firstDir && firstDir !== S.dir && S.dirs.has(firstDir) && S.tab === 'library' && !$('q').value) goDir(firstDir); else renderList();
+  updateSyncDot();
   toast(t('imported', { n: added, s: same }));
   if (added && added <= 50) scheduleSync();
   if (!S.current) renderEmpty();
@@ -909,7 +955,7 @@ function bind() {
     const b = e.target.closest('button'); if (!b) return;
     S.tab = b.dataset.tab; $('q').value = ''; S.limit = 300;
     if (S.tab !== 'programs') S.programId = null;
-    renderList(); $('list').scrollTop = 0;
+    saveUi(); renderList(); $('list').scrollTop = 0;
   });
   $('btnBack').addEventListener('click', () => { stopScroll(); setNarrowSong(false); $('editor').hidden = true; if (S.current) renderSong(); });
   $('btnSettings').addEventListener('click', openSettings);
@@ -1001,9 +1047,10 @@ function registerSW() {
 async function start() {
   bind();
   setLang(getLang());
-  const [settings, programs, recent, lastSync, bundleSha, songs] = await Promise.all([
-    loadSettingsReliably(), db.get('programs'), db.get('recent'), db.get('lastSync'), db.get('bundleSha'), db.allSongs(),
+  const [settings, programs, recent, lastSync, bundleSha, songs, vdirs] = await Promise.all([
+    loadSettingsReliably(), db.get('programs'), db.get('recent'), db.get('lastSync'), db.get('bundleSha'), db.allSongs(), db.get('virtualDirs'),
   ]);
+  if (Array.isArray(vdirs)) S.virtualDirs = new Set(vdirs);
   if (settings) S.settings = { ...S.settings, ...settings, gh: { ...S.settings.gh, ...(settings.gh || {}) } };
   if (programs) S.programs = { ...S.programs, ...programs };
   if (recent) S.recent = recent;
@@ -1012,6 +1059,7 @@ async function start() {
   $('qText').checked = S.settings.searchText !== false;
   document.documentElement.style.setProperty('--lyrics-size', S.settings.font + 'px');
   rebuildIndex();
+  loadUi();
   applyLang();
   tick(); setInterval(tick, 1000);
   registerSW();

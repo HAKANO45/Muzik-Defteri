@@ -3,6 +3,13 @@ import { decode, fixEscapedName } from './encoding.js';
 
 const td = new TextDecoder();
 
+/** UTF-8 bayrağı olmayan ad: geçerli UTF-8 ise o, değilse DOS Türkçe (857).
+ *  Windows'un 857 varyantında 0xD5 = "ı" (IBM tablosunda tanımsız). */
+function decodeLegacyName(bytes) {
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch (_) {}
+  return decode(bytes, 'cp857').replace(/\uFFFD/g, 'ı');
+}
+
 async function inflateRaw(data) {
   const s = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
   return new Uint8Array(await new Response(s).arrayBuffer());
@@ -55,8 +62,16 @@ export async function readZip(buf, filter = () => true) {
         e += 4 + sz;
       }
     }
-    let name = (flags & 0x800) ? td.decode(nameBytes) : decode(nameBytes, 'cp857');
-    if (!(flags & 0x800)) { try { name = new TextDecoder('utf-8', { fatal: true }).decode(nameBytes); } catch (_) {} }
+    let name = (flags & 0x800) ? td.decode(nameBytes) : decodeLegacyName(nameBytes);
+    // Info-ZIP Unicode Path (0x7075): Windows'un "Sıkıştırılmış klasör"ü gerçek UTF-8 adı buraya yazar
+    if (!(flags & 0x800)) {
+      let e = p + 46 + nameLen; const end = e + extraLen;
+      while (e + 4 <= end) {
+        const id = dv.getUint16(e, true), sz = dv.getUint16(e + 2, true);
+        if (id === 0x7075 && sz > 5 && u8[e + 4] === 1) { name = td.decode(u8.subarray(e + 9, e + 4 + sz)); break; }
+        e += 4 + sz;
+      }
+    }
     name = fixEscapedName(name.replace(/\\/g, '/'));
     p += 46 + nameLen + extraLen + commLen;
     if (name.endsWith('/') || !filter(name)) continue;
