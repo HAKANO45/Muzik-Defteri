@@ -42,6 +42,8 @@ Uygulama veya araçlar hiçbir söz sitesinden içerik çekmez/kazımaz (scrapin
 - `s` = GitHub blob sha. `dirty` = gönderilmedi. `del` = silinecek işareti. `up/upAt` = gönderildi, paket henüz yetişmedi.
 - `_` ile başlayan alanlar (`_title`, `_ft`, `_fx` …) bellekte türetilir, DB'ye yazılmaz (`strip()`).
 
+Şarkı notları: `notlar.json` → `{ notes: { <yol>: { solist, ton, not, updated, deleted? } } }` — yol başına `updated` ile birleştirilir. Şarkı yeniden adlandırılınca/taşınınca not da taşınır (`replacePathEverywhere`). Toplu taşımada (repertuvar düzenleme) `notlar.json` ve `programlar.json` yolları da güncellenmeli.
+
 Programlar: `{ programs: [{id, name, items:[p], updated, deleted?}], fav: [p], favUpdated }` — senkronda id + `updated` ile birleştirilir; silinen program iz olarak kalır.
 
 ## Senkron akışı (`sync()` — sıra önemli)

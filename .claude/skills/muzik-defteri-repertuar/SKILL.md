@@ -12,6 +12,7 @@ description: Müzik Defteri repertuvarına (HAKANO45/-Muzik-Defteri-Repertuar, p
 repertuar/            şarkılar (.txt), klasör = kategori
 bundle/repertuar.json.gz   uygulamanın indirdiği paket (Action üretir — elle düzenleme)
 programlar.json       programlar (setlist) + favoriler; uygulama yazar
+notlar.json           şarkı notları: solist, ton, kısa not (yol → not); uygulama yazar
 tools/build_bundle.py paket üretici
 tools/fix_filenames.py  "#U00fc" -> "ü" ad düzeltici
 legacy/               eski VB6 programı (sadece referans)
@@ -25,6 +26,9 @@ legacy/               eski VB6 programı (sadece referans)
 - Sanatçı klasörleri: `Türküler/Neset Ertas`, `2.Slov Fantazi Tsm/Orhan Gencebay` …
 - Baştaki sıra numarası (`01.`, `3.`) görünen başlıktan atılır; sıralama için kullanılabilir.
 - Dosya adı = şarkı adı. Windows'ta yasak karakterler `\ / : * ? " < > |` kullanılmaz.
+
+## Taşıma / silme kuralı
+Bir şarkı dosyası taşınır, yeniden adlandırılır veya kopyası silinirse `programlar.json` (items + fav) ve `notlar.json` içindeki eski yollar **aynı commit'te** yeni/kalan yola çevrilir. Hiçbir program şarkı, hiçbir not sahibini kaybetmez.
 
 ## Kodlama
 Mevcut 15.823 dosya: Windows‑1254 (14.347), DOS Türkçe CP857 (977), ASCII (451), UTF‑16 (36), UTF‑8 (12).

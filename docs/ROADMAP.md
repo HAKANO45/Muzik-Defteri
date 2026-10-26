@@ -1,5 +1,10 @@
 # Yol haritası
 
+## v4.4.0 — tamam
+- Şarkı notu: 🎤 Solist (Eylem, Hakan, "Eylem & Hakan"…), 🎵 Ton (Do…Si, minör "m"), kısa not — başlığın yanında, sahne modunda da büyük
+- Notlar `notlar.json` (private depo) ile tüm cihazlara senkron; iPhone'da görünür, düzenleme Windows/Mac/iPad'de
+- Aramada solist/ton/not ile bulma, sonuçlarda en üstte ("eylem" → Eylem'in şarkıları)
+
 ## v4.3.1 — tamam
 - Güncellemeler iPhone'a güvenilir ulaşıyor: servis çalışanı dosyaları HTTP önbelleğini atlayarak indiriyor, uygulama öne gelince güncelleme kontrolü, yeni sürüm hazır olunca otomatik yenileme (sahnede/düzenlerken değil)
 

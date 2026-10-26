@@ -6,7 +6,7 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '4.3.1';
+export const VERSION = '4.4.0';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -30,6 +30,7 @@ const S = {
   tab: 'library', dir: '', programId: null,
   current: null, context: { list: [], label: '' },
   programs: { format: 1, programs: [], fav: [], favUpdated: 0 },
+  notes: { format: 1, notes: {} },   // şarkı notları: yol -> { solist, ton, not, updated } (notlar.json ile senkron)
   recent: [],
   settings: { gh: { owner: 'HAKANO45', repo: '-Muzik-Defteri-Repertuar', branch: 'main', token: '' }, font: 22, stageFont: 34, speed: 30, searchText: true, clock24: true },
   transpose: 0, scrolling: false,
@@ -118,8 +119,10 @@ function search(q, inText) {
   for (const rec of S.songs.values()) {
     if (rec.del) continue;
     let score = 0;
-    if (terms.every(w => rec._ft.includes(w))) score = rec._ft.startsWith(terms[0]) ? 4 : 3;
+    if (S.notes.notes[rec.p] && terms.every(w => noteSearchText(rec.p).includes(w))) score = 5;   // solist/ton/not en üstte
+    else if (terms.every(w => rec._ft.includes(w))) score = rec._ft.startsWith(terms[0]) ? 4 : 3;
     else if (terms.every(w => rec._fp.includes(w))) score = 2;
+    else if (terms.every(w => (rec._fp + ' ' + noteSearchText(rec.p)).includes(w))) score = 2;
     else if (inText) {
       if (rec._fx === null) rec._fx = fold(rec.t);
       if (terms.length > 1 && rec._fx.includes(phrase)) score = 1.5;
@@ -153,6 +156,61 @@ function renderTabs() {
   }
 }
 
+// ------------------------------------------------------------------ şarkı notu (solist, ton, kısa not)
+const NOTES = ['Do', 'Do#', 'Re', 'Mi♭', 'Mi', 'Fa', 'Fa#', 'Sol', 'Sol#', 'La', 'Si♭', 'Si'];
+function noteOf(p) { const n = S.notes.notes[p]; return n && !n.deleted && (n.solist || n.ton || n.not) ? n : null; }
+function noteChips(n, small) {
+  if (!n) return [];
+  return [
+    n.solist ? h('span', { class: 'chip chip-solist' + (small ? ' sm' : '') }, '🎤 ' + n.solist) : null,
+    n.ton ? h('span', { class: 'chip chip-ton' + (small ? ' sm' : '') }, '🎵 ' + n.ton) : null,
+    n.not && !small ? h('span', { class: 'chip chip-not' }, n.not) : null,
+  ].filter(Boolean);
+}
+function noteSearchText(p) { const n = noteOf(p); return n ? fold([n.solist, n.ton, n.not].filter(Boolean).join(' ')) : ''; }
+function allSolists() {
+  const c = new Map();
+  for (const n of Object.values(S.notes.notes)) if (n && !n.deleted && n.solist) for (const s of n.solist.split(/\s*[&,+\/]\s*/)) if (s) c.set(s, (c.get(s) || 0) + 1);
+  return [...c.entries()].sort((a, b) => b[1] - a[1]).map(x => x[0]);
+}
+function saveNotes() { S.notes.dirty = true; db.set('notes', S.notes); scheduleSync(); }
+
+/** Not penceresi: Solist, Ton, kısa not. iPhone'da açılmaz (sadece görüntüleme). */
+function openNoteDialog(p) {
+  if (VIEW_ONLY) { toast(t('viewOnly')); return; }
+  const cur = S.notes.notes[p] || {};
+  const solistIn = h('input', { class: 'field', value: cur.solist || '', placeholder: 'Eylem, Hakan, Eylem & Hakan…', list: 'solistList', autocapitalize: 'words' });
+  const dl = h('datalist', { id: 'solistList' }, allSolists().map(s => h('option', { value: s })));
+  const quick = h('div', { class: 'chip-row' }, ...allSolists().slice(0, 8).map(s =>
+    h('button', { class: 'chip chip-btn-solist', onclick: () => {
+      const v = solistIn.value.trim();
+      solistIn.value = !v ? s : v.split(/\s*&\s*/).includes(s) ? v : v + ' & ' + s;
+    } }, s)));
+  const m = /^(.*?)(\s*m)?$/.exec(cur.ton || '');
+  const tonSel = h('select', { class: 'field' }, h('option', { value: '' }, '—'), ...NOTES.map(n => h('option', { value: n, selected: m && m[1] === n }, n)));
+  const minor = h('input', { type: 'checkbox', checked: !!(m && m[2]) });
+  const notIn = h('input', { class: 'field', value: cur.not || '', placeholder: t('notePlaceholder'), maxlength: 80 });
+  const save = () => {
+    const ton = tonSel.value ? tonSel.value + (minor.checked ? 'm' : '') : '';
+    const solist = solistIn.value.replace(/\s+/g, ' ').trim(), not = notIn.value.trim();
+    S.notes.notes[p] = solist || ton || not ? { solist, ton, not, updated: Date.now() } : { deleted: true, updated: Date.now() };
+    saveNotes(); closeModal(); renderSong(); if (!$('stage').hidden) renderStage(); renderList();
+    toast(t('saved'));
+  };
+  modal(h('h2', {}, '🏷 ' + t('songNote')),
+    h('label', {}, t('solist')), solistIn, dl, quick,
+    h('label', {}, t('ton')), h('div', { class: 'ton-row' }, tonSel, h('label', { class: 'toggle' }, minor, h('span', {}, t('minor')))),
+    h('label', {}, t('shortNote')), notIn,
+    h('div', { class: 'btn-row' }, h('button', { class: 'btn primary', onclick: save }, t('save')), h('button', { class: 'btn', onclick: closeModal }, t('cancel'))));
+  setTimeout(() => solistIn.focus(), 30);
+}
+
+function mergeNotes(local, remote) {
+  const out = { ...(remote && remote.notes || {}) };
+  for (const [p, n] of Object.entries(local.notes || {})) if (!out[p] || (n.updated || 0) > (out[p].updated || 0)) out[p] = n;
+  return { format: 1, notes: out };
+}
+
 function songItem(p, { sub, html, acts, ctx } = {}) {
   const rec = S.songs.get(p);
   const missing = !rec || rec.del;
@@ -163,7 +221,7 @@ function songItem(p, { sub, html, acts, ctx } = {}) {
       onclick: e => { if (e.target.closest('.acts')) return; if (!missing) openSong(p, ctx); },
       onkeydown: e => { if (e.key === 'Enter' && !missing) openSong(p, ctx); } },
     h('span', { class: 'ico' }, rec && rec.dirty ? '✱' : '♪'),
-    h('span', { class: 'main' }, h('span', { class: 'name' }, title, ...tags), subEl),
+    h('span', { class: 'main' }, h('span', { class: 'name' }, title, ...tags, ...noteChips(missing ? null : noteOf(p), true)), subEl),
     acts ? h('span', { class: 'acts' }, ...acts) : null);
 }
 
@@ -365,6 +423,7 @@ function renderSong() {
     tbBtn(isFav ? '★' : '☆', isFav ? t('unfavorite') : t('favorite'), () => toggleFav(rec.p), isFav ? 'on' : ''),
     tbBtn('＋', t('addToProgram'), () => addToProgramDialog(rec.p)),
     tbBtn('🔎', t('searchWeb'), () => webSearch(rec._title)),
+    VIEW_ONLY ? null : tbBtn('🏷', t('songNote'), () => openNoteDialog(rec.p)),
     VIEW_ONLY ? null : tbBtn('✎', t('edit'), () => openEditor(rec.p)),
     tbBtn('⎙', t('print'), () => window.print()),
     VIEW_ONLY ? null : tbBtn('🗑', t('delete'), () => deleteSong(rec.p)),
@@ -372,6 +431,8 @@ function renderSong() {
   ].filter(Boolean));
   renderPhoneBar(rec, idx);
   $('songTitle').textContent = rec._title;
+  $('songNote').replaceChildren(...noteChips(noteOf(rec.p)),
+    VIEW_ONLY ? '' : h('button', { class: 'chip chip-add', title: t('songNote'), onclick: () => openNoteDialog(rec.p) }, noteOf(rec.p) ? '✎' : '＋ ' + t('songNote')));
   const meta = $('songMeta'); meta.replaceChildren();
   const d = dirName(rec.p);
   if (idx >= 0) meta.append(h('span', { class: 'pos only-phone' }, `${idx + 1}/${S.context.list.length}`));
@@ -425,6 +486,7 @@ function openSongSheet(rec) {
       act('＋', t('addToProgram'), () => addToProgramDialog(rec.p)),
       act('⛶', t('stage'), openStage),
       act('🔎', t('searchWeb'), () => webSearch(rec._title)),
+      VIEW_ONLY ? null : act('🏷', t('songNote'), () => openNoteDialog(rec.p)),
       VIEW_ONLY ? null : act('✎', t('edit'), () => openEditor(rec.p)),
       VIEW_ONLY ? null : act('🗑', t('delete'), () => deleteSong(rec.p), 'danger')),
     stepper(t('speed'), speedVal, () => { setSpeed(-5); speedVal.textContent = S.settings.speed; }, () => { setSpeed(5); speedVal.textContent = S.settings.speed; }),
@@ -519,6 +581,7 @@ function closeStage() {
 function renderStage() {
   const rec = S.songs.get(S.current); if (!rec) return;
   $('stageTitle').textContent = rec._title;
+  $('stageNote').replaceChildren(...noteChips(noteOf(rec.p)));
   $('stageLyrics').innerHTML = lyricsHtml(rec.t);
   const i = S.context.list.indexOf(rec.p);
   $('stagePos').textContent = (S.context.label ? S.context.label + ' · ' : '') + (i >= 0 ? `${i + 1}/${S.context.list.length}` : '');
@@ -683,6 +746,11 @@ async function deleteSong(p) {
 
 function replacePathEverywhere(a, b) {
   let changed = false;
+  if (S.notes.notes[a] && !S.notes.notes[a].deleted) {
+    S.notes.notes[b] = { ...S.notes.notes[a], updated: Date.now() };
+    S.notes.notes[a] = { deleted: true, updated: Date.now() };
+    saveNotes();
+  }
   for (const pr of S.programs.programs) {
     const i = pr.items.indexOf(a);
     if (i >= 0) { pr.items[i] = b; pr.updated = Date.now(); changed = true; }
@@ -755,7 +823,7 @@ function mergePrograms(local, remote) {
 
 // ------------------------------------------------------------------ senkronizasyon
 function gh() { return new GitHub(S.settings.gh); }
-function pendingCount() { let n = 0; for (const s of S.songs.values()) if (s.dirty) n++; return n + (S.programs.dirty ? 1 : 0); }
+function pendingCount() { let n = 0; for (const s of S.songs.values()) if (s.dirty) n++; return n + (S.programs.dirty ? 1 : 0) + (S.notes.dirty ? 1 : 0); }
 
 function updateSyncDot() {
   const d = $('syncDot');
@@ -822,6 +890,16 @@ async function sync({ quiet = false } = {}) {
     }
     S.programs.dirty = false;
     await db.set('programs', S.programs);
+    // 4) Şarkı notları (solist, ton, kısa not)
+    {
+      const { data: nd, sha: nsha } = await g.getJson('notlar.json');
+      const mergedN = mergeNotes(S.notes, nd);
+      const changedN = JSON.stringify(mergedN.notes) !== JSON.stringify((nd && nd.notes) || {});
+      S.notes = mergedN;
+      if (changedN) await g.putFile('notlar.json', new TextEncoder().encode(JSON.stringify(mergedN, null, 1)), 'Şarkı notları güncellendi', nsha || undefined);
+      S.notes.dirty = false;
+      await db.set('notes', S.notes);
+    }
     S.sync.last = Date.now();
     await db.set('lastSync', S.sync.last);
     if (!quiet) toast(t('syncDone'));
@@ -1196,9 +1274,10 @@ function registerSW() {
 async function start() {
   bind();
   setLang(getLang());
-  const [settings, programs, recent, lastSync, bundleSha, songs, vdirs] = await Promise.all([
-    loadSettingsReliably(), db.get('programs'), db.get('recent'), db.get('lastSync'), db.get('bundleSha'), db.allSongs(), db.get('virtualDirs'),
+  const [settings, programs, recent, lastSync, bundleSha, songs, vdirs, notes] = await Promise.all([
+    loadSettingsReliably(), db.get('programs'), db.get('recent'), db.get('lastSync'), db.get('bundleSha'), db.allSongs(), db.get('virtualDirs'), db.get('notes'),
   ]);
+  if (notes && notes.notes) S.notes = notes;
   if (Array.isArray(vdirs)) S.virtualDirs = new Set(vdirs);
   if (settings) S.settings = { ...S.settings, ...settings, gh: { ...S.settings.gh, ...(settings.gh || {}) } };
   if (programs) S.programs = { ...S.programs, ...programs };
