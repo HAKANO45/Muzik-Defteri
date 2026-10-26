@@ -6,7 +6,7 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '4.3.0';
+export const VERSION = '4.3.1';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -1171,13 +1171,24 @@ function onKey(e) {
 // ------------------------------------------------------------------ servis çalışanı (çevrimdışı)
 function registerSW() {
   if (!('serviceWorker' in navigator)) return;
-  navigator.serviceWorker.register('sw.js').then(reg => {
-    reg.addEventListener('updatefound', () => {
-      const nw = reg.installing;
-      nw && nw.addEventListener('statechange', () => {
-        if (nw.state === 'installed' && navigator.serviceWorker.controller) toast(t('updateReady'), { label: t('reload'), fn: () => location.reload() });
-      });
-    });
+  // Yeni servis çalışanı devreye girince sayfayı yenile — ama sahnede/düzenlerken değil.
+  let reloading = false;
+  const hadController = !!navigator.serviceWorker.controller;
+  const safeReload = () => {
+    if (reloading) return;
+    if (!$('stage').hidden || !$('editor').hidden || !$('modal').hidden) {
+      toast(t('updateReady'), { label: t('reload'), fn: () => location.reload() });
+      return;
+    }
+    reloading = true; location.reload();
+  };
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController) safeReload(); });
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+    // iPhone'da uygulama arka plandan dönünce sayfa yeniden yüklenmez → güncellemeyi kendimiz kontrol ederiz
+    const check = () => { if (navigator.onLine) reg.update().catch(() => {}); };
+    check();
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+    setInterval(check, 30 * 60 * 1000);
   }).catch(() => {});
 }
 
@@ -1209,4 +1220,4 @@ async function start() {
 }
 
 start();
-window.__md = S; // hata ayıklama için
+window.__md = S; window.__mdVersion = VERSION; // hata ayıklama için

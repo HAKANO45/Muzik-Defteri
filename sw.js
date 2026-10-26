@@ -1,6 +1,6 @@
 // Servis çalışanı: uygulama dosyalarını önbelleğe alır -> internetsiz açılır.
 // YENİ SÜRÜM YAYINLARKEN: CACHE adını artır (ör. md-v4.0.1), yoksa cihazlar eski dosyayı kullanır.
-const CACHE = 'md-v4.3.0';
+const CACHE = 'md-v4.3.1';
 const FILES = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
   'js/app.js', 'js/db.js', 'js/github.js', 'js/encoding.js', 'js/codepages.js', 'js/zip.js', 'js/textutil.js', 'js/i18n.js',
@@ -8,7 +8,11 @@ const FILES = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  // cache:'reload' → tarayıcının HTTP önbelleğini atla (GitHub Pages 10 dk önbellekler);
+  // yoksa yeni sürümün önbelleğine eski app.js girebilir (iPhone'da 4.1.0'da kalma sebebi).
+  e.waitUntil(caches.open(CACHE)
+    .then(c => Promise.all(FILES.map(f => fetch(new Request(f, { cache: 'reload' })).then(r => { if (!r.ok) throw new Error(f + ' ' + r.status); return c.put(f, r); }))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {

@@ -1,5 +1,8 @@
 # Yol haritası
 
+## v4.3.1 — tamam
+- Güncellemeler iPhone'a güvenilir ulaşıyor: servis çalışanı dosyaları HTTP önbelleğini atlayarak indiriyor, uygulama öne gelince güncelleme kontrolü, yeni sürüm hazır olunca otomatik yenileme (sahnede/düzenlerken değil)
+
 ## v4.3.0 — tamam
 - iPhone = sadece görüntüleme (kullanıcı kararı): ＋♪ yeni şarkı, ＋📁 klasör, düzenle, sil, içe aktarma iPhone'da yok; bunlar Windows, MacBook ve iPad'de
 - iPhone'da kalan: okuma, arama, sahne modu, otomatik kaydırma, favori, programlar, senkron, ZIP dışa aktarma
