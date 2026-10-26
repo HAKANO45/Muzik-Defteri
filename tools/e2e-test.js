@@ -6,6 +6,11 @@ const fs = require('fs'); const crypto = require('crypto');
 const BUNDLE = fs.readFileSync(process.env.BUNDLE || '../Muzik-Defteri-Repertuar/bundle/repertuar.json.gz');
 const bsha = crypto.createHash('sha1').update(BUNDLE).digest('hex');
 const puts = []; let programs = null;
+// iPhone dikeyde (≤600px) düğmeler ⋯ alt sayfasında, diğer ekranlarda üst araç çubuğunda
+async function songAction(page, label) {
+  if (await page.isVisible('#phoneBar')) { await page.click('#phoneBar .pb-btn[title="Diğer"]'); await page.click(`.sheet-act:has-text("${label}")`); }
+  else await page.click(`#songToolbar button[title="${label}"]`);
+}
 async function back(page){ if (await page.isVisible('#btnBack')) await page.click('#btnBack'); }
 const shot = process.argv[2] || 'desk';
 (async () => {
@@ -87,14 +92,14 @@ const shot = process.argv[2] || 'desk';
   await page.screenshot({ path: (process.env.OUT || '/tmp') + '/' + shot + '-5-search-lyrics.png' });
   // aç, favori, programa ekle
   await page.locator('#list .item').first().click();
-  await page.click('button[title="Favori"]');
-  await page.click('button[title="Programa ekle"]');
+  await songAction(page, 'Favori');
+  await songAction(page, 'Programa ekle');
   await page.click('text=＋ Yeni program');
   await page.fill('.modal-card input', 'Cumartesi Düğün');
   await page.click('.modal-card >> text=OK');
   await page.waitForTimeout(300);
   // düzenle ve kaydet
-  await page.click('button[title="Düzenle"]');
+  await songAction(page, 'Düzenle');
   await page.screenshot({ path: (process.env.OUT || '/tmp') + '/' + shot + '-6-editor.png' });
   await page.locator('#editor textarea').press('End');
   await page.locator('#editor textarea').type('\nYENİ SATIR şğıİüöç');
