@@ -98,13 +98,22 @@ const shot = process.argv[2] || 'desk';
   await page.fill('.modal-card input', 'Cumartesi Düğün');
   await page.click('.modal-card >> text=OK');
   await page.waitForTimeout(300);
-  // düzenle ve kaydet
+  // düzenle ve kaydet (iPhone = sadece görüntüleme: Düzenle/Sil/＋♪ olmamalı)
+  if (shot === 'phone') {
+    await page.click('#phoneBar .pb-btn[title="Diğer"]');
+    const acts = await page.locator('.sheet-act').allInnerTexts();
+    console.log('iPhone sheet actions:', acts.map(x => x.replace(/\s+/g, ' ')));
+    if (acts.some(x => /Düzenle|Sil/.test(x))) throw new Error('iPhone view-only ihlali');
+    await page.click('.sheet-close');
+    await page.waitForTimeout(5500);
+  } else {
   await songAction(page, 'Düzenle');
   await page.screenshot({ path: (process.env.OUT || '/tmp') + '/' + shot + '-6-editor.png' });
   await page.locator('#editor textarea').press('End');
   await page.locator('#editor textarea').type('\nYENİ SATIR şğıİüöç');
   await page.click('#editor >> text=Kaydet');
   await page.waitForTimeout(5500);
+  }
   console.log('PUTs:', puts.map(p => p.path + ' sha=' + p.sha + ' len=' + p.len));
   const songPut = puts.find(p => p.path.startsWith('repertuar/'));
   if (songPut) console.log('encoded tail bytes:', songPut.content.slice(-24).toString('hex'), '(cp1254 ş=fe ğ=f0 ı=fd İ=dd)');

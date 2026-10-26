@@ -1,14 +1,14 @@
 // Yeni şarkı akışı testi (v4.2): Sanatçı/Şarkı adı, İnternette ara, Panodan yapıştır, taslak geri yükleme, GitHub'a gönderim.
-// Kullanım: python3 -m http.server 8765 &  ->  node tools/e2e-newsong.js phone|desk   (sözler uydurma metindir)
+// Kullanım: python3 -m http.server 8765 &  ->  node tools/e2e-newsong.js ipad|desk   (sözler uydurma metindir)
 const { chromium, devices } = require('playwright');
 const fs = require('fs'); const crypto = require('crypto');
 const BUNDLE = fs.readFileSync(process.env.BUNDLE || '../Muzik-Defteri-Repertuar/bundle/repertuar.json.gz');
 const bsha = crypto.createHash('sha1').update(BUNDLE).digest('hex');
-const dev = process.argv[2] || 'phone';
+const dev = process.argv[2] || 'ipad';  // iPhone sadece görüntüleme — yeni şarkı iPad/Windows/Mac'te
 const puts = [];
 (async () => {
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ ...(dev === 'phone' ? devices['iPhone 13'] : { viewport: { width: 1366, height: 860 } }), permissions: ['clipboard-read', 'clipboard-write'] });
+  const ctx = await browser.newContext({ ...(dev === 'ipad' ? devices['iPad (gen 7)'] : { viewport: { width: 1366, height: 860 } }), permissions: ['clipboard-read', 'clipboard-write'] });
   const page = await ctx.newPage(); const errors = []; page.on('pageerror', e => errors.push(e.message));
   await page.route('https://api.github.com/**', async route => {
     const req = route.request(); const url = new URL(req.url()); const acc = req.headers()['accept'] || '';

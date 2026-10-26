@@ -230,8 +230,8 @@ input, textarea, select { font: inherit; color: var(--text); }
   }
   .editor > .btn-row:last-child .btn { flex: 1; height: 48px; }
 
-  /* bildirim üstte: alt çubuğu ve Kaydet düğmesini kapatmasın */
-  .toast { bottom: auto; top: calc(64px + var(--safe-t)); }
+  /* bildirim alt çubuğun üstünde */
+  .toast { bottom: calc(80px + var(--safe-b)); }
 
   /* liste */
   .item { min-height: 52px; }
@@ -273,3 +273,4 @@ input, textarea, select { font: inherit; color: var(--text); }
   .lyrics { color: #000; font-size: 15pt; }
   .lyrics .chord { color: #000; }
 }
+.view-only .sheet-grid { grid-template-columns: repeat(2, 1fr); }

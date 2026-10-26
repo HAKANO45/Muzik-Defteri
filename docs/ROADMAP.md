@@ -1,5 +1,10 @@
 # Yol haritası
 
+## v4.3.0 — tamam
+- iPhone = sadece görüntüleme (kullanıcı kararı): ＋♪ yeni şarkı, ＋📁 klasör, düzenle, sil, içe aktarma iPhone'da yok; bunlar Windows, MacBook ve iPad'de
+- iPhone'da kalan: okuma, arama, sahne modu, otomatik kaydırma, favori, programlar, senkron, ZIP dışa aktarma
+- "🔎 İnternette ara" her cihazda: arama sonuçlarının üstünde ve şarkı menüsünde (ayrı sekmede Google araması)
+
 ## v4.2.0 — tamam
 - Yeni şarkı ekranı: Sanatçı + Şarkı adı → dosya adı otomatik "Sanatçı - Şarkı adı.txt", son kullanılan klasör hatırlanır
 - "İnternette ara": aramayı ayrı sekmede açar (uygulama hiçbir siteden içerik çekmez)

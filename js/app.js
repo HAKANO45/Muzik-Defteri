@@ -6,8 +6,20 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '4.2.0';
+export const VERSION = '4.3.0';
 const $ = id => document.getElementById(id);
+
+/** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
+ *  Windows, MacBook ve iPad'de yapılır (kullanıcı kararı). Yatay iPhone da telefon sayılır. */
+const UA = navigator.userAgent;
+export const VIEW_ONLY = /iPhone|iPod/.test(UA) || (/Android/.test(UA) && /Mobile/.test(UA));
+document.documentElement.classList.toggle('view-only', VIEW_ONLY);
+
+/** Şarkıyı/aramayı internette ayrı sekmede açar (uygulama içerik çekmez). */
+function webSearch(q) {
+  q = (q || '').trim(); if (!q) return;
+  window.open('https://www.google.com/search?q=' + encodeURIComponent(q + ' şarkı sözleri'), '_blank', 'noopener');
+}
 
 // ------------------------------------------------------------------ durum
 const S = {
@@ -163,7 +175,8 @@ function renderList() {
 
   if (q) {
     const res = search(q, $('qText').checked);
-    head.append(t('results', { n: res.length }));
+    head.append(t('results', { n: res.length }), h('span', { class: 'spacer' }),
+      h('button', { class: 'small-btn', onclick: () => webSearch(q) }, '🔎 ' + t('searchWeb')));
     if (!res.length) list.append(h('div', { class: 'list-note' }, t('noResults')));
     const ctx = { list: res.map(r => r.p), label: '“' + q + '”' };
     for (const r of res.slice(0, S.limit)) {
@@ -184,8 +197,8 @@ function renderList() {
       head.append(h('button', { class: 'crumb', onclick: () => goDir(d) }, part));
     });
     head.append(h('span', { class: 'spacer' }),
-      h('button', { class: 'small-btn', title: t('newFolder'), onclick: newFolder }, '＋📁'),
-      h('button', { class: 'small-btn', title: t('newSong'), onclick: () => openEditor(null) }, '＋♪'));
+      VIEW_ONLY ? null : h('button', { class: 'small-btn', title: t('newFolder'), onclick: newFolder }, '＋📁'),
+      VIEW_ONLY ? null : h('button', { class: 'small-btn', title: t('newSong'), onclick: () => openEditor(null) }, '＋♪'));
     const node = S.dirs.get(S.dir) || { dirs: new Set(), files: [] };
     const dirs = [...node.dirs].sort((a, b) => S.collator.compare(baseName(a), baseName(b)));
     for (const d of dirs) {
@@ -198,7 +211,7 @@ function renderList() {
     for (const p of node.files.slice(0, S.limit)) list.append(songItem(p, { ctx, sub: '' }));
     if (node.files.length > S.limit) list.append(h('button', { class: 'small-btn', style: 'margin:10px', onclick: () => { S.limit += 300; renderList(); } }, t('showMore', { n: node.files.length - S.limit })));
     if (!dirs.length && !node.files.length) {
-      list.append(h('div', { class: 'list-note' }, S.songs.size ? t('emptyFolder') : t('welcomeText')));
+      list.append(h('div', { class: 'list-note' }, S.songs.size ? (VIEW_ONLY ? '—' : t('emptyFolder')) : t('welcomeText')));
       if (S.dir && S.virtualDirs.has(S.dir)) list.append(h('button', { class: 'small-btn', style: 'margin:0 12px', onclick: () => deleteEmptyFolder(S.dir) }, '🗑 ' + t('deleteFolder')));
     }
     return;
@@ -269,6 +282,7 @@ function loadUi() {
 function saveVirtualDirs() { return db.set('virtualDirs', [...S.virtualDirs]); }
 
 async function newFolder() {
+  if (VIEW_ONLY) { toast(t('viewOnly')); return; }
   const name = await promptText(t('newFolder'), '');
   if (!name) return;
   const clean = name.replace(/[\\/:*?"<>|]/g, '').trim();
@@ -350,9 +364,10 @@ function renderSong() {
     h('span', { class: 'grow' }),
     tbBtn(isFav ? '★' : '☆', isFav ? t('unfavorite') : t('favorite'), () => toggleFav(rec.p), isFav ? 'on' : ''),
     tbBtn('＋', t('addToProgram'), () => addToProgramDialog(rec.p)),
-    tbBtn('✎', t('edit'), () => openEditor(rec.p)),
+    tbBtn('🔎', t('searchWeb'), () => webSearch(rec._title)),
+    VIEW_ONLY ? null : tbBtn('✎', t('edit'), () => openEditor(rec.p)),
     tbBtn('⎙', t('print'), () => window.print()),
-    tbBtn('🗑', t('delete'), () => deleteSong(rec.p)),
+    VIEW_ONLY ? null : tbBtn('🗑', t('delete'), () => deleteSong(rec.p)),
     tbBtn('⛶', t('stage'), openStage),
   ].filter(Boolean));
   renderPhoneBar(rec, idx);
@@ -409,9 +424,9 @@ function openSongSheet(rec) {
       act(isFav ? '★' : '☆', isFav ? t('unfavorite') : t('favorite'), () => toggleFav(rec.p), isFav ? 'on' : ''),
       act('＋', t('addToProgram'), () => addToProgramDialog(rec.p)),
       act('⛶', t('stage'), openStage),
-      act('✎', t('edit'), () => openEditor(rec.p)),
-      act('⎙', t('print'), () => window.print()),
-      act('🗑', t('delete'), () => deleteSong(rec.p), 'danger')),
+      act('🔎', t('searchWeb'), () => webSearch(rec._title)),
+      VIEW_ONLY ? null : act('✎', t('edit'), () => openEditor(rec.p)),
+      VIEW_ONLY ? null : act('🗑', t('delete'), () => deleteSong(rec.p), 'danger')),
     stepper(t('speed'), speedVal, () => { setSpeed(-5); speedVal.textContent = S.settings.speed; }, () => { setSpeed(5); speedVal.textContent = S.settings.speed; }),
     chords ? stepper(t('transpose'), keyVal, () => { S.transpose--; renderSong(); keyVal.textContent = (S.transpose > 0 ? '+' : '') + S.transpose; },
       () => { S.transpose++; renderSong(); keyVal.textContent = (S.transpose > 0 ? '+' : '') + S.transpose; }) : null,
@@ -538,6 +553,7 @@ function songFileName(artist, title) {
 }
 
 function openEditor(p, draft) {
+  if (VIEW_ONLY) { toast(t('viewOnly')); return; }
   stopScroll();
   const rec = p ? S.songs.get(p) : null;
   const isNew = !rec;
@@ -652,6 +668,7 @@ async function removeSong(p) {
 }
 
 async function deleteSong(p) {
+  if (VIEW_ONLY) { toast(t('viewOnly')); return; }
   const rec = S.songs.get(p); if (!rec) return;
   if (!(await confirmBox(t('confirmDelete', { name: rec._title })))) return;
   const L = S.context.list, i = L.indexOf(p);
@@ -868,6 +885,7 @@ function importPrefixToDrop(names) {
 }
 
 async function importEntries(entries) {   // [{ name: 'klasör/dosya.txt', bytes }]
+  if (VIEW_ONLY) { toast(t('viewOnly')); return; }
   entries = entries.filter(e => /\.txt$/i.test(e.name) && !e.name.split('/').some(x => x.startsWith('__MACOSX') || x.startsWith('.')));
   const top = importPrefixToDrop(entries.map(e => e.name));
   let added = 0, same = 0;
@@ -997,10 +1015,11 @@ async function openSettings() {
     h('p', {}, (pendingCount() ? t('pending', { n: pendingCount() }) + ' · ' : '') + t('lastSync', { time: S.sync.last ? new Date(S.sync.last).toLocaleString(getLang()) : t('never') })),
     h('h3', {}, t('importExport')),
     h('p', {}, t('importTarget', { f: S.dir || t('root') })),
+    VIEW_ONLY ? h('p', {}, t('viewOnly')) : null,
     h('div', { class: 'btn-row' },
-      h('button', { class: 'btn', onclick: () => { closeModal(); $('fileZip').click(); } }, t('importZip')),
-      h('button', { class: 'btn', onclick: () => { closeModal(); $('fileTxt').click(); } }, t('importTxt')),
-      isIos ? null : h('button', { class: 'btn', onclick: () => { closeModal(); $('fileDir').click(); } }, t('importFolder')),
+      VIEW_ONLY ? null : h('button', { class: 'btn', onclick: () => { closeModal(); $('fileZip').click(); } }, t('importZip')),
+      VIEW_ONLY ? null : h('button', { class: 'btn', onclick: () => { closeModal(); $('fileTxt').click(); } }, t('importTxt')),
+      VIEW_ONLY || isIos ? null : h('button', { class: 'btn', onclick: () => { closeModal(); $('fileDir').click(); } }, t('importFolder')),
       h('button', { class: 'btn', onclick: () => { closeModal(); exportZip(); } }, t('exportZip'))),
     h('h3', {}, t('install')),
     standalone ? h('p', {}, '✓') : installEvt ? h('div', { class: 'btn-row' }, h('button', { class: 'btn primary', onclick: async () => { installEvt.prompt(); installEvt = null; closeModal(); } }, t('install'))) : h('p', {}, isIos ? t('installIos') : 'Edge/Chrome: ⋯ → ' + t('install')),
@@ -1038,8 +1057,8 @@ function renderEmpty() {
   }
   box.append(h('h2', { style: 'color:var(--gold)' }, t('welcomeTitle')), h('p', {}, t('welcomeText')),
     h('div', { class: 'btn-row' }, h('button', { class: 'btn primary', onclick: openSettings }, t('connectGithub'))),
-    h('p', { class: 'hint', style: 'margin-top:18px' }, t('orLocal')),
-    h('div', { class: 'btn-row' },
+    VIEW_ONLY ? null : h('p', { class: 'hint', style: 'margin-top:18px' }, t('orLocal')),
+    VIEW_ONLY ? null : h('div', { class: 'btn-row' },
       h('button', { class: 'btn', onclick: () => $('fileZip').click() }, t('importZip')),
       h('button', { class: 'btn', onclick: () => $('fileTxt').click() }, t('importTxt'))));
 }
@@ -1186,7 +1205,7 @@ async function start() {
   if (gh().ok && navigator.onLine) sync({ quiet: S.songs.size > 0 });
   // yarım kalan yeni şarkı taslağı (iPhone Safari'ye geçerken uygulama kapanmış olabilir)
   const draft = loadDraft();
-  if (draft && (draft.text || draft.title || draft.artist)) { openEditor(null, draft); toast(t('draftRestored')); }
+  if (!VIEW_ONLY && draft && (draft.text || draft.title || draft.artist)) { openEditor(null, draft); toast(t('draftRestored')); }
 }
 
 start();
