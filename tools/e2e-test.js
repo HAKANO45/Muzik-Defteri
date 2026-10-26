@@ -35,6 +35,25 @@ const shot = process.argv[2] || 'desk';
   await page.goto('http://localhost:8765/'); await page.evaluate(() => localStorage.setItem('md.lang','tr')); await page.reload();
   await page.waitForTimeout(800);
   await page.screenshot({ path: (process.env.OUT || '/tmp') + '/' + shot + '-0-welcome.png' });
+  // iPhone: token ayarlardan kaydedilince kapat/aç sonrası korunmalı.
+  // Test sırasında gerçek API çağrısını önlemek için owner boş bırakılır.
+  await page.click('#btnSettings');
+  await page.locator('.modal-card input[placeholder="HAKANO45"]').fill('');
+  await page.locator('.modal-card input[type="password"]').fill('test-persistent-token');
+  await page.locator('.modal-card button').filter({ hasText: /Kapat|Close/ }).click();
+  await page.waitForFunction(() => document.getElementById('modal').hidden);
+  await page.reload();
+  await page.waitForFunction(() => window.__md && window.__md.settings.gh.token === 'test-persistent-token');
+  const settingsSaved = await page.evaluate(async () => {
+    const { db } = await import('./js/db.js');
+    const primary = await db.get('settings');
+    const backup = JSON.parse(localStorage.getItem('md.settings.backup.v1') || 'null');
+    return primary?.gh?.token === 'test-persistent-token' && backup?.gh?.token === 'test-persistent-token';
+  });
+  if (!settingsSaved) throw new Error('GitHub access token not persisted across reload');
+  // Mevcut büyük repertuvar entegrasyon testinden önce test yedeğini kaldır.
+  await page.evaluate(() => localStorage.removeItem('md.settings.backup.v1'));
+
   // GitHub ayarla
   await page.evaluate(async () => {
     const { db } = await import('./js/db.js');
