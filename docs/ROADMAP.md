@@ -1,5 +1,11 @@
 # Yol haritası
 
+## v4.1.0 — tamam
+- iPhone dikey (≤ 600px) için ayrı düzen: üstteki iki sıra düğme yerine başparmakla ulaşılan alt çubuk (‹ A− ▶ A+ › ⋯), "⋯" alt sayfasında favori/program/sahne/düzenle/yazdır/sil/hız/ton
+- Uzun şarkı adları artık kesilmiyor; sıra numarası (14/64) başlığın altında
+- Hız/yazı/favori değişince okunan yer başa atlamıyor
+- iPad ve Windows düzeni değişmedi
+
 ## v4.0.2 — tamam
 - iPhone: yeni (boş) klasör uygulama kapanınca kayboluyordu → artık IndexedDB'de saklanıyor; boş klasör silinebilir
 - ZIP/klasör içe aktarırken üst klasör atılıyordu ("2.Slov Fantazi Tsm.zip" içeriği köke dağılıyordu) → klasör korunuyor; sadece "Repertuar…" kökü veya zaten içinde bulunulan klasör atlanır

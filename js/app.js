@@ -6,7 +6,7 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '4.0.2';
+export const VERSION = '4.1.0';
 const $ = id => document.getElementById(id);
 
 // ------------------------------------------------------------------ durum
@@ -355,9 +355,11 @@ function renderSong() {
     tbBtn('🗑', t('delete'), () => deleteSong(rec.p)),
     tbBtn('⛶', t('stage'), openStage),
   ].filter(Boolean));
+  renderPhoneBar(rec, idx);
   $('songTitle').textContent = rec._title;
   const meta = $('songMeta'); meta.replaceChildren();
   const d = dirName(rec.p);
+  if (idx >= 0) meta.append(h('span', { class: 'pos only-phone' }, `${idx + 1}/${S.context.list.length}`));
   meta.append(h('button', { onclick: () => goDir(d) }, '📁 ' + (d || t('root'))));
   for (const tg of rec._tags) meta.append(h('span', { class: 'tag' }, tg));
   meta.append(h('span', {}, ENC_LABEL[rec.e] || rec.e || ''));
@@ -366,7 +368,56 @@ function renderSong() {
   if (dups.length) meta.append(h('button', { onclick: () => showDuplicates(rec.p, dups) }, t('duplicates', { n: dups.length })));
   $('lyrics').innerHTML = lyricsHtml(rec.t);
   document.documentElement.style.setProperty('--lyrics-size', S.settings.font + 'px');
-  $('songScroll').scrollTop = 0;
+  // sadece şarkı değişince başa dön (hız/favori değişince okunan yer kaybolmasın)
+  if (S._shown !== rec.p) { $('songScroll').scrollTop = 0; S._shown = rec.p; }
+}
+
+// ------------------------------------------------------------------ iPhone dikey arayüz
+const phoneMq = matchMedia('(max-width: 600px)');
+function isPhone() { return phoneMq.matches; }
+phoneMq.addEventListener && phoneMq.addEventListener('change', () => { if (S.current && !$('song').hidden) renderSong(); });
+
+function pbBtn(label, title, fn, cls = '') { return h('button', { class: 'pb-btn ' + cls, title, 'aria-label': title, onclick: fn }, label); }
+
+function renderPhoneBar(rec, idx) {
+  const L = S.context.list;
+  $('phoneBar').replaceChildren(
+    pbBtn('‹', t('prev'), () => step(-1), idx <= 0 ? 'dim' : ''),
+    pbBtn('A−', t('fontSmaller'), () => setFont(-2)),
+    pbBtn(S.scrolling ? '❚❚' : '▶', t('autoScroll'), toggleScroll, 'play' + (S.scrolling ? ' on' : '')),
+    pbBtn('A+', t('fontBigger'), () => setFont(2)),
+    pbBtn('›', t('next'), () => step(1), idx < 0 || idx >= L.length - 1 ? 'dim' : ''),
+    pbBtn('⋯', t('more'), () => openSongSheet(rec)),
+  );
+}
+
+/** "⋯" alt sayfası: iPhone'da üst çubuktaki diğer tüm düğmeler burada, büyük ve tek elle. */
+function openSongSheet(rec) {
+  const isFav = S.programs.fav.includes(rec.p);
+  const chords = hasChords(rec.t);
+  const act = (icon, label, fn, cls = '') => h('button', { class: 'sheet-act ' + cls, onclick: () => { closeModal(); fn(); } },
+    h('span', { class: 'sheet-ico' }, icon), h('span', {}, label));
+  const speedVal = h('span', { class: 'sheet-val' }, S.settings.speed);
+  const keyVal = h('span', { class: 'sheet-val' }, (S.transpose > 0 ? '+' : '') + S.transpose);
+  const stepper = (label, valEl, minus, plus) => h('div', { class: 'sheet-row' },
+    h('span', { class: 'sheet-label' }, label),
+    h('button', { class: 'pb-btn', onclick: minus }, '−'), valEl, h('button', { class: 'pb-btn', onclick: plus }, '+'));
+  modal(
+    h('div', { class: 'sheet-grab' }),
+    h('div', { class: 'sheet-title' }, rec._title),
+    h('div', { class: 'sheet-grid' },
+      act(isFav ? '★' : '☆', isFav ? t('unfavorite') : t('favorite'), () => toggleFav(rec.p), isFav ? 'on' : ''),
+      act('＋', t('addToProgram'), () => addToProgramDialog(rec.p)),
+      act('⛶', t('stage'), openStage),
+      act('✎', t('edit'), () => openEditor(rec.p)),
+      act('⎙', t('print'), () => window.print()),
+      act('🗑', t('delete'), () => deleteSong(rec.p), 'danger')),
+    stepper(t('speed'), speedVal, () => { setSpeed(-5); speedVal.textContent = S.settings.speed; }, () => { setSpeed(5); speedVal.textContent = S.settings.speed; }),
+    chords ? stepper(t('transpose'), keyVal, () => { S.transpose--; renderSong(); keyVal.textContent = (S.transpose > 0 ? '+' : '') + S.transpose; },
+      () => { S.transpose++; renderSong(); keyVal.textContent = (S.transpose > 0 ? '+' : '') + S.transpose; }) : null,
+    h('button', { class: 'btn sheet-close', onclick: closeModal }, t('close')),
+  );
+  $('modal').classList.add('sheet');
 }
 
 function showDuplicates(p, dups) {
@@ -429,6 +480,8 @@ function updateScrollButtons() {
   if (S.current && !$('song').hidden) {
     const b = [...$('songToolbar').children].find(x => x.title === t('autoScroll'));
     if (b) { b.textContent = S.scrolling ? '❚❚' : '▶'; b.classList.toggle('on', S.scrolling); }
+    const pb = $('phoneBar').querySelector('.play');
+    if (pb) { pb.textContent = S.scrolling ? '❚❚' : '▶'; pb.classList.toggle('on', S.scrolling); }
   }
 }
 
@@ -801,8 +854,8 @@ function exportZip() {
 }
 
 // ------------------------------------------------------------------ modal yardımcıları
-function modal(...kids) { $('modalCard').replaceChildren(...kids); $('modal').hidden = false; }
-function closeModal() { $('modal').hidden = true; $('modalCard').replaceChildren(); }
+function modal(...kids) { $('modal').classList.remove('sheet'); $('modalCard').replaceChildren(...kids.filter(Boolean)); $('modal').hidden = false; }
+function closeModal() { $('modal').hidden = true; $('modal').classList.remove('sheet'); $('modalCard').replaceChildren(); }
 function promptText(title, value) {
   return new Promise(res => {
     const inp = h('input', { class: 'field', value });

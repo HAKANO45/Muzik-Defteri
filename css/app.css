@@ -180,10 +180,74 @@ input, textarea, select { font: inherit; color: var(--text); }
   .grid2 { grid-template-columns: 1fr; }
 }
 
+/* ---------- iPhone dikey (≤ 600px) — iPad/Windows bu bloktan etkilenmez ---------- */
+.phone-bar, .only-phone { display: none; }
+@media (max-width: 600px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .viewer, .sidebar { min-width: 0; }
+  .topbar { gap: 8px; }
+  #btnLang { display: none; }               /* dil: ⚙ Ayarlar içinde */
+  .brand span:last-child { display: none; }
+  .clock { font-size: 20px; padding: 2px 8px; }
+
+  /* şarkı ekranı: üst araç çubuğu yerine alt çubuk */
+  .song-toolbar { display: none; }
+  .only-phone { display: inline; }
+  .song-scroll { padding: 14px 18px 0; }
+  .song-title { font-size: 25px; line-height: 1.2; overflow-wrap: anywhere; }
+  .song-meta { font-size: 12px; gap: 6px 10px; margin: 6px 0 14px; }
+  .song-meta .pos { color: var(--gold); font-variant-numeric: tabular-nums; font-weight: 600; }
+  .lyrics { overflow-wrap: anywhere; }
+  .song-end { height: 40vh; }
+  .phone-bar {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px;
+    padding: 8px calc(10px + var(--safe-r)) calc(8px + var(--safe-b)) calc(10px + var(--safe-l));
+    background: linear-gradient(#100f0b, #070706); border-top: 1px solid var(--line);
+  }
+  .pb-btn {
+    height: 50px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg2);
+    color: var(--gold); font-size: 21px; font-weight: 600; display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .pb-btn:active { background: var(--bg3); }
+  .pb-btn.play { background: #2a2414; border-color: var(--gold-dim); }
+  .pb-btn.on { background: var(--gold); color: #111; border-color: var(--gold); }
+  .pb-btn.dim { opacity: .35; }
+
+  /* liste */
+  .item { min-height: 52px; }
+  .item .name { font-size: 16px; }
+  .tabs button { font-size: 13px; padding: 0 6px; }
+
+  /* alt sayfa (⋯) */
+  .modal.sheet { align-items: flex-end; padding: 0; }
+  .modal.sheet .modal-card {
+    width: 100%; max-height: 85dvh; border-radius: 18px 18px 0 0; border-bottom: none;
+    padding: 8px 16px calc(16px + var(--safe-b));
+  }
+  .sheet-grab { width: 40px; height: 5px; border-radius: 3px; background: var(--gold-dim); margin: 2px auto 10px; }
+  .sheet-title { color: var(--gold); font-weight: 700; font-size: 16px; margin-bottom: 12px; overflow-wrap: anywhere; }
+  .sheet-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .sheet-act {
+    height: 78px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg); color: var(--text);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-size: 12px;
+  }
+  .sheet-act .sheet-ico { font-size: 24px; color: var(--gold); }
+  .sheet-act.on .sheet-ico { color: var(--gold2); }
+  .sheet-act.danger, .sheet-act.danger .sheet-ico { color: var(--danger); }
+  .sheet-row { display: grid; grid-template-columns: 1fr 56px 56px 56px; gap: 8px; align-items: center; margin-top: 12px; }
+  .sheet-label { color: var(--text2); font-size: 14px; }
+  .sheet-val { text-align: center; color: var(--gold2); font-weight: 700; font-variant-numeric: tabular-nums; font-size: 18px; }
+  .sheet-close { width: 100%; margin-top: 14px; height: 48px; }
+
+  /* sahne */
+  .stage-bar { gap: 6px; }
+  .stage-btn { flex: 1; min-width: 0; }
+}
+
 /* ---------- Yazdırma ---------- */
 @media print {
   body, html { background: #fff; color: #000; height: auto; }
-  .topbar, .sidebar, .song-toolbar, .song-meta, .song-end, .stage, .toast, .modal { display: none !important; }
+  .topbar, .sidebar, .song-toolbar, .phone-bar, .song-meta, .song-end, .stage, .toast, .modal { display: none !important; }
   #app, .layout, .viewer, .song, .song-scroll { display: block !important; height: auto; overflow: visible; }
   .song-title { color: #000; }
   .lyrics { color: #000; font-size: 15pt; }

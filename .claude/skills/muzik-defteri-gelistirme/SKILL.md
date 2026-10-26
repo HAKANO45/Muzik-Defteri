@@ -19,7 +19,7 @@ Windows 11 (Edge/Chrome), iPad ve iPhone (Safari) üzerinde **tek kod** ile çal
 | Dosya | Görev |
 |---|---|
 | `index.html` | İskelet: üst çubuk, kenar çubuğu (arama, sekmeler, liste), görüntüleyici, sahne katmanı, modal |
-| `css/app.css` | Tüm stil. Renkler `:root` değişkenlerinde. Dar ekran kırılımı 820px (iPhone / dikey iPad: liste ↔ şarkı geçişi) |
+| `css/app.css` | Tüm stil. Renkler `:root` değişkenlerinde. Kırılımlar: 820px (liste ↔ şarkı geçişi) ve **600px = iPhone dikey** (üst araç çubuğu gizli, `#phoneBar` alt çubuk + `openSongSheet()` alt sayfa). iPhone'a özel değişiklik sadece 600px bloğuna; iPad/Windows düzenine dokunma |
 | `js/app.js` | Durum (`S`), liste/şarkı/editör/sahne çizimi, programlar, senkron, içe/dışa aktarma, klavye |
 | `js/db.js` | IndexedDB: `songs` (anahtar `p`) ve `kv` (settings, programs, recent, lastSync, bundleSha) |
 | `js/github.js` | GitHub Contents API: paket indirme, dosya yazma/silme, programlar.json |
