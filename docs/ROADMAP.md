@@ -11,6 +11,11 @@
 - İçe aktarma (.txt, klasör, ZIP), ZIP dışa aktarma
 - TR/EN, dijital saat, siyah‑altın tema
 
+## v4.0.1 — iPhone GitHub token kalıcılığı
+- Token ve GitHub bağlantısı, IndexedDB'ye ek olarak aynı cihazın localStorage alanına anında yedeklenir.
+- Ayar girişleri yazılırken kaydedilir; Test/Senkron/Kapat düğmeleri kaydın sonucunu bekler ve hata gösterebilir.
+- Açılışta son kayıt geri yüklenir; repertuvar özel depoda kalır.
+
 ## Fikirler (sırasız — Hakan karar verir)
 - Şarkıya not / ton / tempo / ritim (Ketron/Pa4X style adı) bilgisi ekleme
 - Sahne modunda iki sütun (yatay iPad)
