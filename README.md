@@ -21,13 +21,13 @@ Tek uygulama: **Windows 11**, **iPad**, **iPhone**. Kurulduktan sonra internetsi
 1. **Windows 11:** Edge veya Chrome ile adresi aç → adres çubuğundaki "Uygulamayı yükle" simgesi.
 2. **iPhone / iPad:** Safari ile aç → Paylaş ⬆ → **Ana Ekrana Ekle**.
 3. İlk açılışta ⚙ Ayarlar → GitHub deposu:
-   - Kullanıcı: `HAKANO45`, Depo: `Muzik-Defteri-Repertuar`, Dal: `main`
-   - Erişim anahtarı: GitHub → Settings → Developer settings → Personal access tokens → **Fine‑grained tokens** → Generate → *Repository access: Only select repositories → Muzik-Defteri-Repertuar* → *Permissions → Contents: Read and write*. Anahtar sadece o cihazda saklanır.
+   - Kullanıcı: `HAKANO45`, Depo: `-Muzik-Defteri-Repertuar`, Dal: `main`
+   - Erişim anahtarı: GitHub → Settings → Developer settings → Personal access tokens → **Fine‑grained tokens** → Generate → *Repository access: Only select repositories → -Muzik-Defteri-Repertuar* → *Permissions → Contents: Read and write*. Anahtar sadece o cihazda saklanır.
    - **Senkronize et** (ilk indirme ~4 MB).
 
 ## Mimari
 ```
-Muzik-Defteri (public)            Muzik-Defteri-Repertuar (private)
+Muzik-Defteri (public)            -Muzik-Defteri-Repertuar (private)
   index.html, css/, js/  ──PWA──▶   repertuar/**.txt   (orijinal dosyalar)
   sw.js (çevrimdışı)                bundle/repertuar.json.gz  ◀── GitHub Action
   IndexedDB (cihazda)   ◀──indir──  programlar.json

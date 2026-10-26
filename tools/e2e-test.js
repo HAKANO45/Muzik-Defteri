@@ -18,7 +18,7 @@ const shot = process.argv[2] || 'desk';
   await page.route('https://api.github.com/**', async route => {
     const req = route.request(); const url = new URL(req.url()); const accept = req.headers()['accept'] || '';
     const path = decodeURIComponent(url.pathname.replace(/^\/repos\/[^/]+\/[^/]+\/contents\//, ''));
-    if (url.pathname === '/repos/HAKANO45/Muzik-Defteri-Repertuar') return route.fulfill({ json: { private: true, permissions: { push: true }, default_branch: 'main' } });
+    if (url.pathname === '/repos/HAKANO45/-Muzik-Defteri-Repertuar') return route.fulfill({ json: { private: true, permissions: { push: true }, default_branch: 'main' } });
     if (req.method() === 'GET' && path === 'bundle/repertuar.json.gz') {
       if (accept.includes('raw')) return route.fulfill({ body: BUNDLE, contentType: 'application/octet-stream' });
       return route.fulfill({ json: { sha: bsha } });

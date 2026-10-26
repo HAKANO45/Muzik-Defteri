@@ -1,11 +1,11 @@
 ---
 name: muzik-defteri-repertuar
-description: Müzik Defteri repertuvarına (HAKANO45/Muzik-Defteri-Repertuar, private) şarkı/klasör ekleme, toplu dosya içe aktarma, kodlama ve ad düzeltme, paket (bundle) üretme. Kullanıcı yeni şarkı sözü dosyaları verdiğinde kullan.
+description: Müzik Defteri repertuvarına (HAKANO45/-Muzik-Defteri-Repertuar, private) şarkı/klasör ekleme, toplu dosya içe aktarma, kodlama ve ad düzeltme, paket (bundle) üretme. Kullanıcı yeni şarkı sözü dosyaları verdiğinde kullan.
 ---
 
 # Müzik Defteri — repertuvar dosyaları
 
-Şarkı sözleri **private** `HAKANO45/Muzik-Defteri-Repertuar` deposundadır. Telifli metin: asla public depoya, sohbete toplu halde veya herkese açık bir sayfaya koyma.
+Şarkı sözleri **private** `HAKANO45/-Muzik-Defteri-Repertuar` deposundadır. Telifli metin: asla public depoya, sohbete toplu halde veya herkese açık bir sayfaya koyma.
 
 ## Depo yapısı
 ```

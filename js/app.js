@@ -784,7 +784,7 @@ async function openSettings() {
   const g = S.settings.gh;
   const f = {
     owner: h('input', { class: 'field', value: g.owner, placeholder: 'HAKANO45', autocapitalize: 'off' }),
-    repo: h('input', { class: 'field', value: g.repo, placeholder: 'Muzik-Defteri-Repertuar', autocapitalize: 'off' }),
+    repo: h('input', { class: 'field', value: g.repo, placeholder: '-Muzik-Defteri-Repertuar', autocapitalize: 'off' }),
     branch: h('input', { class: 'field', value: g.branch || 'main', autocapitalize: 'off' }),
     token: h('input', { class: 'field', type: 'password', value: g.token, placeholder: 'github_pat_…', autocomplete: 'off', autocapitalize: 'off' }),
   };
