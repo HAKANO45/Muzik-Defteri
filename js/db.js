@@ -47,6 +47,46 @@ export const db = {
   del: key => tx('kv', 'readwrite', s => { s.delete(key); }),
 };
 
+
+
+// iOS/PWA: GitHub bağlantısı iki cihaz-içi depoda tutulur.
+// Token yalnızca aynı origin'in kendi uygulama kodu tarafından okunabilir;
+// hiçbir zaman public GitHub deposuna veya sunucu loglarına yazılmaz.
+const SETTINGS_BACKUP_KEY = 'md.settings.backup.v1';
+
+export async function loadSettingsReliably() {
+  let primary = null, backup = null;
+  try { primary = await db.get('settings'); } catch (e) { console.warn('IndexedDB settings unavailable:', e); }
+  try { backup = JSON.parse(localStorage.getItem(SETTINGS_BACKUP_KEY) || 'null'); }
+  catch (e) { console.warn('Local settings backup unavailable:', e); }
+
+  const primaryAt = Number(primary && primary._savedAt) || 0;
+  const backupAt = Number(backup && backup._savedAt) || 0;
+  const useBackup = backup && (!primary || backupAt > primaryAt ||
+    (!!(backup.gh && backup.gh.token) && !(primary.gh && primary.gh.token)));
+  if (useBackup) {
+    try { await db.set('settings', backup); }
+    catch (e) { console.warn('Could not restore IndexedDB settings:', e); }
+  }
+  return useBackup ? backup : (primary || null);
+}
+
+export async function persistSettingsReliably(settings) {
+  // Önemli: localStorage senkron yazılır; iOS uygulama kapanırsa son token kaybolmaz.
+  const snapshot = JSON.parse(JSON.stringify(settings));
+  snapshot._savedAt = Date.now();
+  let backupOk = false, dbOk = false, lastError = null;
+  try {
+    const value = JSON.stringify(snapshot);
+    localStorage.setItem(SETTINGS_BACKUP_KEY, value);
+    backupOk = localStorage.getItem(SETTINGS_BACKUP_KEY) === value;
+  } catch (e) { lastError = e; }
+  try { await db.set('settings', snapshot); dbOk = true; }
+  catch (e) { lastError = e; }
+  if (!backupOk && !dbOk) throw lastError || new Error('Settings could not be saved');
+  return true;
+}
+
 /** Tarayıcıdan kalıcı depolama iste (iOS'un verileri silmemesi için). */
 export async function requestPersist() {
   try { if (navigator.storage && navigator.storage.persist) return await navigator.storage.persist(); } catch (_) {}
