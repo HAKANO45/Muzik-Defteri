@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Müzik Defteri</title>
+<meta name="description" content="Şarkı sözü repertuvarı — Windows, iPad, iPhone">
+<meta name="theme-color" content="#0b0b0b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Müzik Defteri">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <button class="icon-btn only-narrow" id="btnBack" hidden aria-label="Geri">‹</button>
+    <div class="brand"><span class="brand-note">♪</span><span id="brandName">MÜZİK DEFTERİ</span></div>
+    <div class="clock" id="clock" aria-label="Saat">00:00<span class="sec">:00</span></div>
+    <div class="top-actions">
+      <button class="icon-btn" id="btnSync" title="Senkronize et"><span class="sync-dot" id="syncDot"></span>⟳</button>
+      <button class="chip-btn" id="btnLang">TR</button>
+      <button class="icon-btn" id="btnSettings" title="Ayarlar">⚙</button>
+    </div>
+  </header>
+
+  <main class="layout" id="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="searchbar">
+        <input type="search" id="q" autocomplete="off" spellcheck="false">
+        <label class="toggle"><input type="checkbox" id="qText" checked><span id="qTextLabel">Sözlerde de ara</span></label>
+      </div>
+      <nav class="tabs" id="tabs">
+        <button data-tab="library" class="active"></button>
+        <button data-tab="programs"></button>
+        <button data-tab="favorites"></button>
+        <button data-tab="recent"></button>
+      </nav>
+      <div class="side-head" id="sideHead"></div>
+      <div class="list" id="list"></div>
+    </aside>
+
+    <section class="viewer" id="viewer">
+      <div class="empty" id="empty">
+        <div class="empty-note">♪</div>
+        <div id="emptyText"></div>
+      </div>
+      <div class="song" id="song" hidden>
+        <div class="song-toolbar" id="songToolbar"></div>
+        <div class="song-scroll" id="songScroll">
+          <h1 class="song-title" id="songTitle"></h1>
+          <div class="song-meta" id="songMeta"></div>
+          <pre class="lyrics" id="lyrics"></pre>
+          <div class="song-end"></div>
+        </div>
+      </div>
+      <div class="editor" id="editor" hidden></div>
+    </section>
+  </main>
+</div>
+
+<!-- Sahne modu -->
+<div class="stage" id="stage" hidden>
+  <div class="stage-top">
+    <span class="stage-pos" id="stagePos"></span>
+    <span class="stage-clock" id="stageClock"></span>
+    <button class="icon-btn" id="stageExit" aria-label="Kapat">✕</button>
+  </div>
+  <div class="stage-scroll" id="stageScroll">
+    <h1 class="stage-title" id="stageTitle"></h1>
+    <pre class="lyrics stage-lyrics" id="stageLyrics"></pre>
+    <div class="song-end"></div>
+  </div>
+  <div class="stage-bar">
+    <button class="stage-btn" id="stagePrev">‹</button>
+    <button class="stage-btn" id="stageSmaller">A−</button>
+    <button class="stage-btn" id="stageScrollBtn">▶</button>
+    <button class="stage-btn" id="stageBigger">A+</button>
+    <button class="stage-btn" id="stageNext">›</button>
+  </div>
+</div>
+
+<div class="modal" id="modal" hidden><div class="modal-card" id="modalCard"></div></div>
+<div class="toast" id="toast" hidden></div>
+<input type="file" id="fileTxt" accept=".txt,text/plain" multiple hidden>
+<input type="file" id="fileZip" accept=".zip,application/zip" hidden>
+<input type="file" id="fileDir" webkitdirectory multiple hidden>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

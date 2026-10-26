@@ -1,0 +1,91 @@
+// Arayüz dilleri: Türkçe (varsayılan) ve İngilizce.
+// Yeni metin eklerken İKİ dile de ekle. Kullanım: t('anahtar', {n: 5})
+
+const STR = {
+  tr: {
+    appName: 'MÜZİK DEFTERİ',
+    library: 'Kütüphane', programs: 'Programlar', favorites: 'Favoriler', recent: 'Son açılanlar',
+    search: 'Şarkı veya söz ara…', searchIn: 'Sözlerde de ara',
+    results: '{n} sonuç', noResults: 'Sonuç yok', songs: '{n} şarkı', folders: '{n} klasör',
+    showMore: 'Daha fazla göster ({n})', root: 'Repertuvar',
+    back: 'Geri', close: 'Kapat', save: 'Kaydet', cancel: 'Vazgeç', delete: 'Sil', edit: 'Düzenle',
+    newSong: 'Yeni şarkı', newFolder: 'Yeni klasör', rename: 'Yeniden adlandır', print: 'Yazdır',
+    fontSmaller: 'Yazıyı küçült', fontBigger: 'Yazıyı büyüt', autoScroll: 'Otomatik kaydır', speed: 'Hız',
+    stage: 'Sahne modu', exitStage: 'Sahneden çık', transpose: 'Ton', addToProgram: 'Programa ekle',
+    favorite: 'Favori', unfavorite: 'Favoriden çıkar', info: 'Bilgi', prev: 'Önceki', next: 'Sonraki',
+    duplicates: 'Aynı adla {n} kopya daha', encoding: 'Kodlama', folder: 'Klasör', fileName: 'Dosya adı',
+    title: 'Başlık', lyrics: 'Sözler', saved: 'Kaydedildi', deleted: 'Silindi',
+    confirmDelete: '"{name}" silinsin mi?', confirmDeleteProgram: '"{name}" programı silinsin mi?',
+    nameExists: 'Bu adla bir dosya zaten var', nameRequired: 'Ad gerekli',
+    newProgram: 'Yeni program', programName: 'Program adı', emptyProgram: 'Bu program boş. Bir şarkı açıp ＋ ile ekle.',
+    startStage: 'Sahneye başla', missingSong: '(bulunamadı)', moveUp: 'Yukarı', moveDown: 'Aşağı', remove: 'Çıkar',
+    addedTo: '"{name}" programına eklendi', choose: 'Seç',
+    settings: 'Ayarlar', language: 'Dil', sync: 'Senkronize et', syncing: 'Senkronize ediliyor…',
+    syncDone: 'Senkron tamam', syncError: 'Senkron hatası: {msg}', offline: 'Çevrimdışı',
+    lastSync: 'Son senkron: {time}', never: 'hiç', pending: '{n} değişiklik gönderilmeyi bekliyor',
+    github: 'GitHub deposu', owner: 'Kullanıcı', repo: 'Depo', branch: 'Dal', token: 'Erişim anahtarı (token)',
+    tokenHelp: 'Sadece bu cihazda saklanır. GitHub → Settings → Developer settings → Fine‑grained tokens → yalnızca repertuvar deposu, "Contents: Read and write".',
+    testConn: 'Bağlantıyı dene', connOk: 'Bağlantı tamam ({vis}, {perm})', private: 'özel', public: 'herkese açık',
+    canWrite: 'yazabilir', readOnly: 'sadece okuma', notPrivateWarn: 'Uyarı: depo herkese açık! Şarkı sözleri için özel (private) olmalı.',
+    importExport: 'İçe / dışa aktar', importTxt: '.txt dosyaları ekle', importFolder: 'Klasör ekle', importZip: 'ZIP içe aktar',
+    exportZip: 'Tümünü ZIP olarak indir', imported: '{n} şarkı eklendi/güncellendi, {s} aynıydı',
+    importTarget: 'Hedef klasör: {f}', working: 'Çalışıyor…', downloading: 'İndiriliyor…', unpacking: 'Açılıyor…',
+    danger: 'Tehlikeli bölge', clearLocal: 'Bu cihazdaki verileri sil', confirmClear: 'Bu cihazdaki tüm şarkılar silinsin mi? (GitHub\'daki kopyaya dokunulmaz)',
+    storage: 'Depolama: {used} kullanılıyor', persistOk: 'kalıcı', persistNo: 'kalıcı değil',
+    welcomeTitle: 'Hoş geldin', welcomeText: 'Repertuvarını yükle. En iyisi GitHub deposunu bağlamak: tüm cihazlarında (Windows, iPad, iPhone) aynı şarkılar olur.',
+    connectGithub: 'GitHub bağla', orLocal: 'veya bu cihazdan yükle:',
+    install: 'Uygulamayı yükle', installIos: 'iPhone/iPad: Paylaş ⬆ → "Ana Ekrana Ekle"',
+    updateReady: 'Yeni sürüm hazır', reload: 'Yenile', version: 'Sürüm',
+    keyboardHelp: 'Klavye / pedal: ← → şarkı değiştir · PageDown/PageUp sayfa (sonda sonraki şarkı) · Boşluk otomatik kaydır · F sahne · Ctrl+F ara',
+    clock24: '24 saat', pushConfirm: '{n} değişiklik GitHub\'a gönderilecek. Devam?', chords: 'Akor',
+  },
+  en: {
+    appName: 'MUSIC NOTEBOOK',
+    library: 'Library', programs: 'Setlists', favorites: 'Favorites', recent: 'Recent',
+    search: 'Search song or lyrics…', searchIn: 'Search lyrics too',
+    results: '{n} results', noResults: 'No results', songs: '{n} songs', folders: '{n} folders',
+    showMore: 'Show more ({n})', root: 'Repertoire',
+    back: 'Back', close: 'Close', save: 'Save', cancel: 'Cancel', delete: 'Delete', edit: 'Edit',
+    newSong: 'New song', newFolder: 'New folder', rename: 'Rename', print: 'Print',
+    fontSmaller: 'Smaller text', fontBigger: 'Bigger text', autoScroll: 'Auto‑scroll', speed: 'Speed',
+    stage: 'Stage mode', exitStage: 'Exit stage', transpose: 'Key', addToProgram: 'Add to setlist',
+    favorite: 'Favorite', unfavorite: 'Remove favorite', info: 'Info', prev: 'Previous', next: 'Next',
+    duplicates: '{n} more copies with same name', encoding: 'Encoding', folder: 'Folder', fileName: 'File name',
+    title: 'Title', lyrics: 'Lyrics', saved: 'Saved', deleted: 'Deleted',
+    confirmDelete: 'Delete "{name}"?', confirmDeleteProgram: 'Delete setlist "{name}"?',
+    nameExists: 'A file with this name already exists', nameRequired: 'Name required',
+    newProgram: 'New setlist', programName: 'Setlist name', emptyProgram: 'This setlist is empty. Open a song and add it with ＋.',
+    startStage: 'Start stage', missingSong: '(missing)', moveUp: 'Up', moveDown: 'Down', remove: 'Remove',
+    addedTo: 'Added to "{name}"', choose: 'Choose',
+    settings: 'Settings', language: 'Language', sync: 'Sync', syncing: 'Syncing…',
+    syncDone: 'Sync complete', syncError: 'Sync error: {msg}', offline: 'Offline',
+    lastSync: 'Last sync: {time}', never: 'never', pending: '{n} changes waiting to upload',
+    github: 'GitHub repository', owner: 'Owner', repo: 'Repository', branch: 'Branch', token: 'Access token',
+    tokenHelp: 'Stored only on this device. GitHub → Settings → Developer settings → Fine‑grained tokens → only the repertoire repo, "Contents: Read and write".',
+    testConn: 'Test connection', connOk: 'Connected ({vis}, {perm})', private: 'private', public: 'public',
+    canWrite: 'can write', readOnly: 'read only', notPrivateWarn: 'Warning: repository is public! It should be private for lyrics.',
+    importExport: 'Import / export', importTxt: 'Add .txt files', importFolder: 'Add folder', importZip: 'Import ZIP',
+    exportZip: 'Download all as ZIP', imported: '{n} songs added/updated, {s} unchanged',
+    importTarget: 'Target folder: {f}', working: 'Working…', downloading: 'Downloading…', unpacking: 'Unpacking…',
+    danger: 'Danger zone', clearLocal: 'Delete data on this device', confirmClear: 'Delete all songs on this device? (GitHub copy is untouched)',
+    storage: 'Storage: {used} used', persistOk: 'persistent', persistNo: 'not persistent',
+    welcomeTitle: 'Welcome', welcomeText: 'Load your repertoire. Best: connect the GitHub repository so all your devices (Windows, iPad, iPhone) share the same songs.',
+    connectGithub: 'Connect GitHub', orLocal: 'or load from this device:',
+    install: 'Install app', installIos: 'iPhone/iPad: Share ⬆ → "Add to Home Screen"',
+    updateReady: 'New version ready', reload: 'Reload', version: 'Version',
+    keyboardHelp: 'Keyboard / pedal: ← → change song · PageDown/PageUp page (next song at end) · Space auto‑scroll · F stage · Ctrl+F search',
+    clock24: '24 hours', pushConfirm: '{n} changes will be uploaded to GitHub. Continue?', chords: 'Chords',
+  },
+};
+
+let lang = 'tr';
+try { lang = localStorage.getItem('md.lang') || (navigator.language || 'tr').slice(0, 2); } catch (_) {}
+if (!STR[lang]) lang = 'tr';
+
+export function getLang() { return lang; }
+export function setLang(l) { lang = STR[l] ? l : 'tr'; try { localStorage.setItem('md.lang', lang); } catch (_) {} document.documentElement.lang = lang; }
+export function t(key, vars) {
+  let s = (STR[lang] && STR[lang][key]) || STR.tr[key] || key;
+  if (vars) s = s.replace(/\{(\w+)\}/g, (_, k) => (vars[k] !== undefined ? vars[k] : ''));
+  return s;
+}
