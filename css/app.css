@@ -120,11 +120,14 @@ input, textarea, select { font: inherit; color: var(--text); }
 .song-end { height: 50vh; }
 
 /* ---------- Editör ---------- */
-.editor { flex: 1; display: flex; flex-direction: column; padding: 14px; gap: 10px; min-height: 0; }
+.editor { flex: 1; display: flex; flex-direction: column; padding: 14px; gap: 10px; min-height: 0; overflow-y: auto; }
 .editor .row { display: flex; gap: 10px; flex-wrap: wrap; }
 .editor label { font-size: 12px; color: var(--text2); display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 200px; }
 .field { height: 42px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); padding: 0 12px; font-size: 16px; outline: none; width: 100%; }
 .field:focus, .editor textarea:focus { border-color: var(--gold); }
+.file-hint { margin: -2px 0 0; min-height: 18px; overflow-wrap: anywhere; color: var(--gold-dim); }
+.helper-row { margin-top: 0; }
+.helper-row .btn { flex: 1; min-width: 150px; }
 .editor textarea { flex: 1; min-height: 240px; resize: none; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); padding: 14px; font-size: 18px; line-height: 1.5; outline: none; }
 
 .btn { height: 42px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--gold-dim); background: var(--bg2); color: var(--gold); font-weight: 600; }
@@ -212,6 +215,23 @@ input, textarea, select { font: inherit; color: var(--text); }
   .pb-btn.play { background: #2a2414; border-color: var(--gold-dim); }
   .pb-btn.on { background: var(--gold); color: #111; border-color: var(--gold); }
   .pb-btn.dim { opacity: .35; }
+
+  /* editör: sanatçı + şarkı adı yan yana, Kaydet her zaman görünür */
+  .editor { padding: 10px 12px 0; gap: 8px; }
+  .editor label { min-width: 0; }
+  .editor .row { flex-wrap: nowrap; }
+  .editor .row:nth-child(2) { flex-wrap: wrap; }
+  .editor .field { height: 40px; font-size: 16px; padding: 0 10px; }
+  .helper-row .btn { min-width: 0; padding: 0 8px; font-size: 15px; white-space: nowrap; }
+  .editor textarea { min-height: 220px; font-size: 17px; padding: 10px; }
+  .editor > .btn-row:last-child {
+    position: sticky; bottom: 0; margin: 0 -12px; padding: 8px 12px calc(8px + var(--safe-b));
+    background: linear-gradient(transparent, var(--bg) 30%); 
+  }
+  .editor > .btn-row:last-child .btn { flex: 1; height: 48px; }
+
+  /* bildirim üstte: alt çubuğu ve Kaydet düğmesini kapatmasın */
+  .toast { bottom: auto; top: calc(64px + var(--safe-t)); }
 
   /* liste */
   .item { min-height: 52px; }

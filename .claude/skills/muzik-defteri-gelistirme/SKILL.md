@@ -31,6 +31,9 @@ Windows 11 (Edge/Chrome), iPad ve iPhone (Safari) üzerinde **tek kod** ile çal
 | `sw.js` | Önbellek (çevrimdışı). **Her yayında `CACHE` sürümünü artır** ve yeni dosya eklediysen `FILES` listesine ekle |
 | `manifest.webmanifest`, `icons/` | Yükleme bilgisi; simgeler `python tools/make_icons.py` ile üretilir |
 
+## Şarkı sözü kaynağı (kesin kural)
+Uygulama veya araçlar hiçbir söz sitesinden içerik çekmez/kazımaz (scraping yok). Yeni şarkı akışı: kullanıcı "İnternette ara" ile sayfayı kendisi açar, metni kendisi kopyalar, "Panodan yapıştır" ile ekler. Otomatik söz getirme ancak lisanslı bir API (Musixmatch/LyricFind ticari anahtar, anahtar sunucu tarafında) ile eklenebilir.
+
 ## Veri modeli
 Şarkı kaydı: `{ p, t, e, n, s, dirty?, del?, up?, upAt?, m }`
 - `p` = `repertuar/` içindeki göreli yol (`Türküler/01.Ussak/Haydar Haydar.txt`). Klasörler yoldan türetilir; ayrı klasör kaydı yok (boş yeni klasör = `S.virtualDirs`).

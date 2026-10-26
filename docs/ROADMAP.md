@@ -1,5 +1,12 @@
 # Yol haritası
 
+## v4.2.0 — tamam
+- Yeni şarkı ekranı: Sanatçı + Şarkı adı → dosya adı otomatik "Sanatçı - Şarkı adı.txt", son kullanılan klasör hatırlanır
+- "İnternette ara": aramayı ayrı sekmede açar (uygulama hiçbir siteden içerik çekmez)
+- "Panodan yapıştır": kullanıcının kopyaladığı metni temizleyip ekler (görünmez karakterler, fazla boş satırlar)
+- Kaydedince GitHub'a hemen gönderilir; iPhone Safari'ye geçerken uygulama kapanırsa taslak geri gelir
+- iPhone: editör sığdırıldı, Kaydet hep görünür, bildirimler üstte
+
 ## v4.1.0 — tamam
 - iPhone dikey (≤ 600px) için ayrı düzen: üstteki iki sıra düğme yerine başparmakla ulaşılan alt çubuk (‹ A− ▶ A+ › ⋯), "⋯" alt sayfasında favori/program/sahne/düzenle/yazdır/sil/hız/ton
 - Uzun şarkı adları artık kesilmiyor; sıra numarası (14/64) başlığın altında

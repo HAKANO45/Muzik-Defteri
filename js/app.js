@@ -6,7 +6,7 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '4.1.0';
+export const VERSION = '4.2.0';
 const $ = id => document.getElementById(id);
 
 // ------------------------------------------------------------------ durum
@@ -520,40 +520,106 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 // ------------------------------------------------------------------ editör
 function allDirs() { return [...S.dirs.keys()].filter(Boolean).sort((a, b) => S.collator.compare(a, b)); }
 
-function openEditor(p) {
+/** Yapıştırılan metni temizler: görünmez karakterler, satır sonu boşlukları, fazla boş satırlar. */
+function cleanPasted(text) {
+  return text.replace(/\r\n?/g, '\n').replace(/[\u00a0\u2007\u202f]/g, ' ').replace(/[\u200b-\u200d\ufeff]/g, '')
+    .split('\n').map(l => l.replace(/\s+$/, '')).join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+}
+
+/** Yeni şarkı taslağı: iPhone'da Safari'ye geçince uygulama kapanabilir — yazılanlar kaybolmasın. */
+const DRAFT_KEY = 'md.draft';
+function saveDraft(d) { try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, at: Date.now() })); } catch (_) {} }
+function loadDraft() { try { const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); return d && Date.now() - d.at < 7 * 864e5 ? d : null; } catch (_) { return null; } }
+function clearDraft() { try { localStorage.removeItem(DRAFT_KEY); } catch (_) {} }
+
+function songFileName(artist, title) {
+  const a = artist.replace(/[\\/:*?"<>|]/g, '').trim(), ti = title.replace(/[\\/:*?"<>|]/g, '').trim();
+  return a && ti ? `${a} - ${ti}` : (ti || a);
+}
+
+function openEditor(p, draft) {
   stopScroll();
   const rec = p ? S.songs.get(p) : null;
+  const isNew = !rec;
   const ed = $('editor');
-  const nameIn = h('input', { class: 'field', value: rec ? baseName(rec.p).replace(/\.txt$/i, '') : '', placeholder: t('fileName') });
+  let lastNewDir = '';
+  try { lastNewDir = localStorage.getItem('md.newDir') || ''; } catch (_) {}
   const dl = h('datalist', { id: 'dirList' }, allDirs().map(d => h('option', { value: d })));
-  const dirIn = h('input', { class: 'field', list: 'dirList', value: rec ? dirName(rec.p) : S.dir, placeholder: t('root') });
-  const ta = h('textarea', { spellcheck: 'false' });
-  ta.value = rec ? rec.t : '';
+  const dirIn = h('input', { class: 'field', list: 'dirList', value: draft ? draft.dir : rec ? dirName(rec.p) : (S.dir || lastNewDir), placeholder: t('root') });
+  const ta = h('textarea', { spellcheck: 'false', placeholder: isNew ? t('lyricsPlaceholder') : '' });
+  ta.value = draft ? draft.text : rec ? rec.t : '';
+  // yeni şarkı: sanatçı + şarkı adı; mevcut şarkı: dosya adı
+  const artistIn = h('input', { class: 'field', value: draft ? draft.artist : '', placeholder: t('artist'), autocapitalize: 'words' });
+  const titleIn = h('input', { class: 'field', value: draft ? draft.title : '', placeholder: t('songName'), autocapitalize: 'words' });
+  const nameIn = h('input', { class: 'field', value: rec ? baseName(rec.p).replace(/\.txt$/i, '') : '', placeholder: t('fileName') });
+  const fileHint = h('div', { class: 'hint file-hint' });
+  const updateHint = () => {
+    if (!isNew) return;
+    const n = songFileName(artistIn.value, titleIn.value);
+    fileHint.textContent = n ? '📄 ' + (dirIn.value ? dirIn.value + '/' : '') + n + '.txt' : '';
+    saveDraft({ artist: artistIn.value, title: titleIn.value, dir: dirIn.value, text: ta.value });
+  };
+  if (isNew) for (const el of [artistIn, titleIn, dirIn, ta]) el.addEventListener('input', updateHint);
+
+  const searchWeb = () => {
+    const q = [artistIn.value, titleIn.value].map(x => x.trim()).filter(Boolean).join(' ');
+    if (!q) { toast(t('nameRequired')); titleIn.focus(); return; }
+    updateHint();
+    window.open('https://www.google.com/search?q=' + encodeURIComponent(q + ' şarkı sözleri'), '_blank', 'noopener');
+  };
+  const pasteClip = async () => {
+    try {
+      const txt = await navigator.clipboard.readText();
+      if (!txt || !txt.trim()) { toast(t('clipboardEmpty')); return; }
+      ta.value = cleanPasted(txt);
+      updateHint();
+      toast(t('pasted', { n: ta.value.split('\n').filter(l => l.trim()).length }));
+    } catch (_) {
+      // izin yoksa: kullanıcı metin alanına uzun basıp "Yapıştır" der
+      ta.focus(); toast(t('pasteManual'));
+    }
+  };
+  ta.addEventListener('paste', () => setTimeout(() => { ta.value = cleanPasted(ta.value); updateHint(); }, 0));
+
   const save = async () => {
-    const name = nameIn.value.replace(/[\\/:*?"<>|]/g, '').trim();
-    if (!name) { toast(t('nameRequired')); nameIn.focus(); return; }
+    const name = isNew ? songFileName(artistIn.value, titleIn.value) : nameIn.value.replace(/[\\/:*?"<>|]/g, '').trim();
+    if (!name) { toast(t('nameRequired')); (isNew ? titleIn : nameIn).focus(); return; }
+    if (isNew && !ta.value.trim()) { toast(t('lyricsRequired')); ta.focus(); return; }
     const dir = dirIn.value.split('/').map(x => x.trim()).filter(Boolean).join('/');
     const newPath = (dir ? dir + '/' : '') + (/\.txt$/i.test(name) ? name : name + '.txt');
     const existing = S.songs.get(newPath);
     if (existing && !existing.del && newPath !== (rec && rec.p)) { toast(t('nameExists')); return; }
     await saveSong(rec ? rec.p : null, newPath, ta.value.replace(/\r\n?/g, '\n'));
+    if (isNew) { clearDraft(); try { localStorage.setItem('md.newDir', dir); } catch (_) {} }
     ed.hidden = true;
     openSong(newPath, S.context.list.includes(newPath) ? null : { list: S.dirs.get(dirName(newPath))?.files || [newPath], label: dirName(newPath) });
-    toast(t('saved'));
+    toast(gh().ok ? t('savedUploading') : t('saved'));
+    if (isNew) scheduleSync(800);
   };
-  ed.replaceChildren(
+  const cancel = () => { if (isNew) clearDraft(); ed.hidden = true; if (S.current) renderSong(); else { $('empty').hidden = false; setNarrowSong(false); } };
+
+  ed.replaceChildren(...[
+    isNew ? h('div', { class: 'row' },
+      h('label', {}, t('artist'), artistIn),
+      h('label', {}, t('songName'), titleIn)) : null,
     h('div', { class: 'row' },
-      h('label', {}, t('fileName'), nameIn),
+      isNew ? null : h('label', {}, t('fileName'), nameIn),
       h('label', {}, t('folder'), dirIn, dl)),
+    isNew ? fileHint : null,
+    isNew ? h('div', { class: 'btn-row helper-row' },
+      h('button', { class: 'btn', onclick: searchWeb }, '🔎 ' + t('searchWeb')),
+      h('button', { class: 'btn', onclick: pasteClip }, '📋 ' + t('pasteClipboard'))) : null,
     ta,
     h('div', { class: 'btn-row' },
       h('button', { class: 'btn primary', onclick: save }, t('save')),
-      h('button', { class: 'btn', onclick: () => { ed.hidden = true; if (S.current) renderSong(); else { $('empty').hidden = false; setNarrowSong(false); } } }, t('cancel')),
-      rec ? h('span', { class: 'hint', style: 'align-self:center' }, t('encoding') + ': ' + (ENC_LABEL[rec.e] || rec.e)) : null));
+      h('button', { class: 'btn', onclick: cancel }, t('cancel')),
+      rec ? h('span', { class: 'hint', style: 'align-self:center' }, t('encoding') + ': ' + (ENC_LABEL[rec.e] || rec.e)) : null),
+  ].filter(Boolean));
   ta.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); save(); } });
   $('song').hidden = true; $('empty').hidden = true; ed.hidden = false;
   setNarrowSong(true);
-  (rec ? ta : nameIn).focus();
+  updateHint();
+  if (!draft) (rec ? ta : artistIn).focus();
 }
 
 async function saveSong(oldPath, newPath, text) {
@@ -686,10 +752,10 @@ function updateSyncDot() {
 }
 
 let syncTimer;
-function scheduleSync() {
+function scheduleSync(delay = 4000) {
   if (!gh().ok) return;
   clearTimeout(syncTimer);
-  syncTimer = setTimeout(() => { if (navigator.onLine) sync({ quiet: true }); }, 4000);
+  syncTimer = setTimeout(() => { if (navigator.onLine) sync({ quiet: true }); }, delay);
 }
 
 async function sync({ quiet = false } = {}) {
@@ -1118,6 +1184,9 @@ async function start() {
   registerSW();
   requestPersist();
   if (gh().ok && navigator.onLine) sync({ quiet: S.songs.size > 0 });
+  // yarım kalan yeni şarkı taslağı (iPhone Safari'ye geçerken uygulama kapanmış olabilir)
+  const draft = loadDraft();
+  if (draft && (draft.text || draft.title || draft.artist)) { openEditor(null, draft); toast(t('draftRestored')); }
 }
 
 start();
