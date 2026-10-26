@@ -1,12 +1,12 @@
 // Müzik Defteri v4 — ana uygulama
-import { db, requestPersist } from './db.js';
+import { db, requestPersist, loadSettingsReliably, persistSettingsReliably } from './db.js';
 import { GitHub } from './github.js';
 import { bytesToSong, songToBytes, ENC_LABEL } from './encoding.js';
 import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '4.0.0';
+export const VERSION = '4.0.1';
 const $ = id => document.getElementById(id);
 
 // ------------------------------------------------------------------ durum
@@ -19,7 +19,7 @@ const S = {
   current: null, context: { list: [], label: '' },
   programs: { format: 1, programs: [], fav: [], favUpdated: 0 },
   recent: [],
-  settings: { gh: { owner: '', repo: '', branch: 'main', token: '' }, font: 22, stageFont: 34, speed: 30, searchText: true, clock24: true },
+  settings: { gh: { owner: 'HAKANO45', repo: '-Muzik-Defteri-Repertuar', branch: 'main', token: '' }, font: 22, stageFont: 34, speed: 30, searchText: true, clock24: true },
   transpose: 0, scrolling: false,
   sync: { busy: false, last: 0, error: '', bundleSha: '' },
   limit: 300,
@@ -789,9 +789,18 @@ async function openSettings() {
     token: h('input', { class: 'field', type: 'password', value: g.token, placeholder: 'github_pat_…', autocomplete: 'off', autocapitalize: 'off' }),
   };
   const status = h('div', { class: 'status' });
-  const readGh = () => { S.settings.gh = { owner: f.owner.value.trim(), repo: f.repo.value.trim(), branch: f.branch.value.trim() || 'main', token: f.token.value.trim() }; saveSettings(); };
+  const readGh = async () => {
+    S.settings.gh = { owner: f.owner.value.trim(), repo: f.repo.value.trim(),
+      branch: f.branch.value.trim() || 'main', token: f.token.value.trim() };
+    const ok = await saveSettings();
+    if (!ok) { status.className = 'status err'; status.textContent = t('settingsSaveError'); }
+    return ok;
+  };
+  // iPhone'da uygulama arka plana atılsa bile token ilk yazıldığı anda yerel yedeğe girer.
+  for (const field of Object.values(f)) field.addEventListener('input', () => { readGh(); });
   const test = async () => {
-    readGh(); status.className = 'status'; status.textContent = t('working');
+    if (!(await readGh())) return;
+    status.className = 'status'; status.textContent = t('working');
     try {
       const r = await gh().testAccess();
       status.className = 'status ok';
@@ -818,7 +827,7 @@ async function openSettings() {
     h('p', {}, t('tokenHelp')),
     h('div', { class: 'btn-row' },
       h('button', { class: 'btn', onclick: test }, t('testConn')),
-      h('button', { class: 'btn primary', onclick: () => { readGh(); closeModal(); sync(); } }, '⟳ ' + t('sync'))),
+      h('button', { class: 'btn primary', onclick: async () => { if (!(await readGh())) return; closeModal(); sync(); } }, '⟳ ' + t('sync'))),
     status,
     h('p', {}, (pendingCount() ? t('pending', { n: pendingCount() }) + ' · ' : '') + t('lastSync', { time: S.sync.last ? new Date(S.sync.last).toLocaleString(getLang()) : t('never') })),
     h('h3', {}, t('importExport')),
@@ -835,7 +844,7 @@ async function openSettings() {
     h('p', {}, storageTxt),
     h('div', { class: 'btn-row' }, h('button', { class: 'btn danger', onclick: clearLocal }, t('clearLocal'))),
     h('p', {}, t('version') + ' ' + VERSION),
-    h('div', { class: 'btn-row' }, h('button', { class: 'btn', onclick: () => { readGh(); closeModal(); } }, t('close'))),
+    h('div', { class: 'btn-row' }, h('button', { class: 'btn', onclick: async () => { if (await readGh()) { closeModal(); toast(t('settingsSaved')); } } }, t('close'))),
   );
 }
 
@@ -846,7 +855,13 @@ async function clearLocal() {
   rebuildIndex(); closeModal(); renderList(); renderEmpty(); updateSyncDot();
 }
 
-function saveSettings() { db.set('settings', S.settings); }
+function saveSettings() {
+  return persistSettingsReliably(S.settings).catch(e => {
+    console.error('Could not save settings:', e);
+    toast(t('settingsSaveError'));
+    return false;
+  });
+}
 
 // ------------------------------------------------------------------ boş ekran / dil
 function renderEmpty() {
@@ -987,7 +1002,7 @@ async function start() {
   bind();
   setLang(getLang());
   const [settings, programs, recent, lastSync, bundleSha, songs] = await Promise.all([
-    db.get('settings'), db.get('programs'), db.get('recent'), db.get('lastSync'), db.get('bundleSha'), db.allSongs(),
+    loadSettingsReliably(), db.get('programs'), db.get('recent'), db.get('lastSync'), db.get('bundleSha'), db.allSongs(),
   ]);
   if (settings) S.settings = { ...S.settings, ...settings, gh: { ...S.settings.gh, ...(settings.gh || {}) } };
   if (programs) S.programs = { ...S.programs, ...programs };
