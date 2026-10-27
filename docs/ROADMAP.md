@@ -1,5 +1,10 @@
 # Yol haritası
 
+## v5.3.0 — tamam (önizlemeyle onaylandı)
+- ↕ Kendi sıralama: klasör başına ▲▼ ile sıra, `siralama.json` ile tüm cihazlara senkron; A→Z sıfırlar. Klasörler üstte, şarkılar altta.
+- ☑ Çoklu seçim: kopyala / taşı (klasör seçici) / yeniden adlandır (tek) / sil — tek commit, blob sha yeniden kullanılır; programlar, notlar, favoriler yeni yola çevrilir.
+- Çift dokunuş → menü (şarkı, klasör, program); basılı tutma da çalışır. Tek dokunuş ~260 ms sonra açar.
+
 ## v5.2.0 — tamam (önizlemeyle onaylandı)
 - ⋯ düğmeleri kalktı: klasöre ve programa **basılı tut** → menü (klasör: Aç, Yeniden adlandır, İçine yeni klasör, Kopyala, Taşı, Sil · program: Aç, Sahneye başla, Yeniden adlandır, Kopyala, Sil); kısa dokunuş açar
 - İki parmak (pinch) sadece şarkı yazısını büyütür/küçültür, sayfa yakınlaşması kapalı; sahne modunda da

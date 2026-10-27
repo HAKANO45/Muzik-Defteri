@@ -13,6 +13,7 @@ repertuar/            şarkılar (.txt), klasör = kategori
 bundle/repertuar.json.gz   uygulamanın indirdiği paket (Action üretir — elle düzenleme)
 programlar.json       programlar (setlist) + favoriler; uygulama yazar
 notlar.json           şarkı notları: solist, ton, kısa not (yol → not); uygulama yazar
+siralama.json         kullanıcının klasör içi sırası: { order: { <klasör>: { names:[…], updated } } }; uygulama yazar
 tools/build_bundle.py paket üretici
 tools/fix_filenames.py  "#U00fc" -> "ü" ad düzeltici
 legacy/               eski VB6 programı (sadece referans)
