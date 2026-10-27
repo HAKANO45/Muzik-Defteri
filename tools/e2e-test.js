@@ -71,7 +71,8 @@ const shot = process.argv[2] || 'desk';
   console.log('loaded songs in', Date.now() - t0, 'ms');
   await page.screenshot({ path: (process.env.OUT || '/tmp') + '/' + shot + '-1-library.png' });
   // Klasöre gir
-  await page.locator('.item', { hasText: 'Türk Halk Müziği' }).first().click();
+  await page.locator('.item', { hasText: 'Türküler' }).first().click();
+  await page.locator('.item', { hasText: '01.Ussak' }).first().click();
   await page.screenshot({ path: (process.env.OUT || '/tmp') + '/' + shot + '-2-folder.png' });
   await page.locator('.item', { hasText: 'Haydar Haydar' }).first().click();
   await page.waitForTimeout(200);

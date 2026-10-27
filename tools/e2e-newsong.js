@@ -25,7 +25,7 @@ const puts = [];
   await page.waitForFunction(() => window.__md.songs.size > 5000 && !window.__md.sync.busy, null, { timeout: 60000 });
   await page.waitForTimeout(2800);
   console.log('head:', await page.locator('#sideHead').innerText(), 'items:', await page.locator('#list .item').count(), 'editor:', await page.isVisible('#editor'), 'layout:', await page.getAttribute('#layout','class'));
-    await page.locator('.item', { hasText: 'Pop' }).first().click();
+    await page.locator('.item', { hasText: 'KINA' }).first().click();
   await page.click('button[title="Yeni şarkı"]');
   await page.fill('#editor input[placeholder="Sanatçı"]', 'Deneme Sanatçı');
   await page.fill('#editor input[placeholder="Şarkı adı"]', 'Deneme Şarkı');

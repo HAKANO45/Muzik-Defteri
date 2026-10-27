@@ -50,7 +50,7 @@ const trees = [], commits = [], patches = [], puts = [];
     '| kalan:', await page.evaluate(() => [...window.__md.songs.keys()].filter(p => p.startsWith('Arabesk/')).length), '| fav:', await page.evaluate(() => window.__md.programs.fav));
   // 4) büyük klasör: Yeni -> Yeni Arşiv (yazarak onay yok, sadece süre ölç)
   await page.click('.crumb >> nth=0');
-  await page.locator('.item', { hasText: 'Karışık (türü belirsiz)' }).first().click();
+  await page.locator('.item', { hasText: 'Yeni' }).last().click();
   const t0 = Date.now();
   await page.click('button[title="Klasörü yeniden adlandır / taşı"]');
   await page.fill('.modal-card input', 'Yeni Arşiv'); await page.click('.modal-card >> text=OK');
@@ -59,6 +59,6 @@ const trees = [], commits = [], patches = [], puts = [];
   console.log('Büyük klasör taşıma süresi', Date.now() - t0, 'ms | ağaç parçası', tc.length, '| commit:', commits[commits.length - 1].message, '| şarkı:', await page.evaluate(() => [...window.__md.songs.keys()].filter(p => p.startsWith('Yeni Arşiv/')).length));
   // 5) yeniden açılış: kalıcı mı
   await page.reload(); await page.waitForTimeout(3000);
-  console.log('yeniden açılış: Yeni Arşiv', await page.evaluate(() => [...window.__md.songs.keys()].filter(p => p.startsWith('Yeni Arşiv/')).length), 'eski Yeni/', await page.evaluate(() => [...window.__md.songs.keys()].filter(p => p.startsWith('Karışık (türü belirsiz)/')).length));
+  console.log('yeniden açılış: Yeni Arşiv', await page.evaluate(() => [...window.__md.songs.keys()].filter(p => p.startsWith('Yeni Arşiv/')).length), 'eski Yeni/', await page.evaluate(() => [...window.__md.songs.keys()].filter(p => p.startsWith('Yeni/')).length));
   console.log('ERR', errors); await browser.close();
 })();
