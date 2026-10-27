@@ -6,7 +6,7 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '5.3.1';
+export const VERSION = '5.4.0';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -16,9 +16,36 @@ export const VIEW_ONLY = /iPhone|iPod/.test(UA) || (/Android/.test(UA) && /Mobil
 document.documentElement.classList.toggle('view-only', VIEW_ONLY);
 
 /** Şarkıyı/aramayı internette ayrı sekmede açar (uygulama içerik çekmez). */
-function webSearch(q) {
+function googleOpen(q) {
   q = (q || '').trim(); if (!q) return;
   window.open('https://www.google.com/search?q=' + encodeURIComponent(q + ' şarkı sözleri'), '_blank', 'noopener');
+}
+const DEVICE = /iPhone|iPod/.test(UA) ? 'iphone' : /Android/.test(UA) ? 'android'
+  : (/iPad/.test(UA) || (/Macintosh/.test(UA) && navigator.maxTouchPoints > 1)) ? 'ipad' : /Macintosh/.test(UA) ? 'mac' : 'windows';
+
+/** İnternette ara: Google ayrı pencerede açılır (uygulama içerik çekmez, yasal). Reklamsız + gece modu için cihaza göre kısa yol. */
+function webSearch(q) {
+  q = (q || '').trim();
+  const qIn = h('input', { class: 'field ws-q', value: q, autocapitalize: 'words', enterkeyhint: 'search',
+    onkeydown: e => { if (e.key === 'Enter') go(); } });
+  const go = () => { const v = qIn.value.trim(); if (!v) return; try { localStorage.setItem('md.wsLast', v); } catch (_) {} googleOpen(v); };
+  const tips = t('wsTips_' + DEVICE).split('|');
+  let open = true; try { open = localStorage.getItem('md.wsTipsClosed') !== '1'; } catch (_) {}
+  const det = h('details', { class: 'ws-tips', open },
+    h('summary', {}, '🌙 ' + t('wsTipsTitle')),
+    h('ol', {}, ...tips.map(x => h('li', {}, x))));
+  det.addEventListener('toggle', () => { try { localStorage.setItem('md.wsTipsClosed', det.open ? '0' : '1'); } catch (_) {} });
+  const parts = q.split(/\s+-\s+/);
+  modal(
+    h('div', { class: 'modal-head' }, h('h2', {}, '🔎 ' + t('searchWeb')), h('button', { class: 'mh-btn', onclick: closeModal }, '✕')),
+    qIn,
+    h('button', { class: 'btn primary ws-go', onclick: go }, '🔎 ' + t('wsGoogle')),
+    det,
+    VIEW_ONLY ? h('div', { class: 'ws-note' }, t('wsPhoneNote'))
+      : h('button', { class: 'btn ws-paste', onclick: () => { closeModal(); openEditor(null, { artist: parts.length > 1 ? parts[0] : '', title: parts.length > 1 ? parts.slice(1).join(' - ') : qIn.value.trim(), dir: S.dir, text: '' }); } },
+          '📋 ' + t('wsPaste')),
+  );
+  setTimeout(() => { if (!q) qIn.focus(); }, 50);
 }
 
 // ------------------------------------------------------------------ durum

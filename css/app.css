@@ -410,3 +410,13 @@ input, textarea, select { font: inherit; color: var(--text); }
 .sheet-note-head { font-weight: 800; font-size: calc(15px * var(--ui)); }
 .sheet-note-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .sheet-note-empty { font-size: calc(18px * var(--ui)); font-weight: 700; }
+
+/* İnternette ara (Google) */
+.ws-q { font-size: calc(19px * var(--ui)); margin: 6px 0 10px; }
+.ws-go { width: 100%; height: calc(58px * var(--ui)); font-size: calc(19px * var(--ui)); font-weight: 900; }
+.ws-tips { margin: 14px 0 8px; border: 1px solid var(--gold-dim); border-radius: 14px; padding: 10px 14px; background: var(--soft); }
+.ws-tips summary { color: var(--gold2); font-weight: 800; font-size: calc(16px * var(--ui)); cursor: pointer; }
+.ws-tips ol { margin: 10px 0 2px; padding-left: 22px; line-height: 1.45; font-size: calc(15px * var(--ui)); }
+.ws-tips li { margin: 6px 0; }
+.ws-paste { width: 100%; height: calc(52px * var(--ui)); margin-top: 6px; font-weight: 800; }
+.ws-note { color: var(--muted, #999); font-size: calc(14px * var(--ui)); margin-top: 8px; }
