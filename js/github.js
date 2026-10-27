@@ -92,6 +92,44 @@ export class GitHub {
     }
   }
 
+  /**
+   * Çok dosyalı tek commit (Git Data API). Klasör taşıma/silme için: içerik yeniden yüklenmez,
+   * var olan blob sha'ları yeni yola bağlanır. changes: [{ path, sha }] | [{ path, bytes }] | [{ path, delete: true }]
+   * Ağaç 2000'lik parçalar halinde kurulur (büyük klasörler, ör. 13 bin dosya).
+   */
+  async commitBatch(changes, message, onProgress) {
+    const api = `${API}/repos/${this.owner}/${this.repo}/git`;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const ref = await (await this.call('GET', `${api}/ref/heads/${encodeURIComponent(this.branch)}`)).json();
+      const head = ref.object.sha;
+      const commit = await (await this.call('GET', `${api}/commits/${head}`)).json();
+      let tree = commit.tree.sha;
+      const entries = [];
+      for (const c of changes) {
+        if (c.delete) entries.push({ path: c.path, mode: '100644', type: 'blob', sha: null });
+        else if (c.sha) entries.push({ path: c.path, mode: '100644', type: 'blob', sha: c.sha });
+        else {
+          const blob = await (await this.call('POST', `${api}/blobs`, { body: { content: toBase64(c.bytes), encoding: 'base64' } })).json();
+          c.sha = blob.sha;
+          entries.push({ path: c.path, mode: '100644', type: 'blob', sha: blob.sha });
+        }
+      }
+      for (let i = 0; i < entries.length; i += 2000) {
+        onProgress && onProgress(Math.min(i + 2000, entries.length), entries.length);
+        const tr = await (await this.call('POST', `${api}/trees`, { body: { base_tree: tree, tree: entries.slice(i, i + 2000) } })).json();
+        tree = tr.sha;
+      }
+      const nc = await (await this.call('POST', `${api}/commits`, { body: { message, tree, parents: [head] } })).json();
+      try {
+        await this.call('PATCH', `${api}/refs/heads/${encodeURIComponent(this.branch)}`, { body: { sha: nc.sha, force: false } });
+        return nc.sha;
+      } catch (e) {
+        if (e.status === 422 && attempt < 2) continue;   // bu arada başka commit geldi → baştan
+        throw e;
+      }
+    }
+  }
+
   async getJson(path) {
     const st = await this.stat(path);
     if (!st) return { data: null, sha: null };

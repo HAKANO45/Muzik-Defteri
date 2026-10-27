@@ -6,7 +6,7 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '4.5.2';
+export const VERSION = '4.6.0';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -30,7 +30,8 @@ const S = {
   tab: 'library', dir: '', programId: null,
   current: null, context: { list: [], label: '' },
   programs: { format: 1, programs: [], fav: [], favUpdated: 0 },
-  notes: { format: 1, notes: {} },   // şarkı notları: yol -> { solist, ton, not, updated } (notlar.json ile senkron)
+  notes: { format: 1, notes: {} },
+  removed: {},                       // klasör işlemiyle kaldırılan yollar -> zaman (eski paket koruması)   // şarkı notları: yol -> { solist, ton, not, updated } (notlar.json ile senkron)
   recent: [],
   settings: { gh: { owner: 'HAKANO45', repo: '-Muzik-Defteri-Repertuar', branch: 'main', token: '' }, font: 22, stageFont: 34, speed: 30, searchText: true, clock24: true },
   transpose: 0, scrolling: false,
@@ -279,7 +280,9 @@ function renderList() {
     });
     head.append(h('span', { class: 'spacer' }),
       VIEW_ONLY ? null : h('button', { class: 'small-btn', title: t('newFolder'), onclick: newFolder }, '＋📁'),
-      VIEW_ONLY ? null : h('button', { class: 'small-btn', title: t('newSong'), onclick: () => openEditor(null) }, '＋♪'));
+      VIEW_ONLY ? null : h('button', { class: 'small-btn', title: t('newSong'), onclick: () => openEditor(null) }, '＋♪'),
+      VIEW_ONLY || !S.dir ? null : h('button', { class: 'small-btn', title: t('renameFolder'), onclick: () => renameFolder(S.dir) }, '✎📁'),
+      VIEW_ONLY || !S.dir ? null : h('button', { class: 'small-btn danger-btn', title: t('deleteFolder'), onclick: () => deleteFolder(S.dir) }, '🗑📁'));
     const node = S.dirs.get(S.dir) || { dirs: new Set(), files: [] };
     const dirs = [...node.dirs].sort((a, b) => S.collator.compare(baseName(a), baseName(b)));
     for (const d of dirs) {
@@ -375,13 +378,125 @@ async function newFolder() {
   goDir(d);
 }
 
-async function deleteEmptyFolder(d) {
-  if (countIn(d)) return;
-  if (!(await confirmBox(t('confirmDelete', { name: baseName(d) })))) return;
+async function deleteEmptyFolder(d) { return deleteFolder(d); }
+
+/** Klasör işleminden sonra 15 dk: eski paket gelirse silinen/taşınan eski yollar geri eklenmesin. */
+const REMOVED_TTL = 15 * 60 * 1000;
+function markRemoved(paths) {
+  const now = Date.now();
+  for (const p of paths) S.removed[p] = now;
+  for (const [p, at] of Object.entries(S.removed)) if (now - at > REMOVED_TTL) delete S.removed[p];
+  db.set('removed', S.removed);
+}
+
+// ------------------------------------------------------------------ klasör: yeniden adlandır / taşı / sil
+/** Klasör altındaki (alt klasörler dahil) şarkılar */
+function songsUnder(d) { return visibleSongs().filter(r => r.p.startsWith(d + '/')); }
+
+/** Yol değişikliklerini notlara, programlara, favorilere, son açılanlara yansıt. map: eski -> yeni | null (silindi) */
+function remapPaths(map) {
+  let nChanged = false, pChanged = false;
+  const now = Date.now();
+  for (const [a, b] of map) {
+    const n = S.notes.notes[a];
+    if (n && !n.deleted) {
+      if (b) S.notes.notes[b] = { ...n, updated: now };
+      S.notes.notes[a] = { deleted: true, updated: now };
+      nChanged = true;
+    }
+  }
+  for (const pr of S.programs.programs) {
+    const items = pr.items.map(x => (map.has(x) ? map.get(x) : x)).filter(Boolean);
+    if (items.length !== pr.items.length || items.some((x, i) => x !== pr.items[i])) { pr.items = items; pr.updated = now; pChanged = true; }
+  }
+  const fav = S.programs.fav.map(x => (map.has(x) ? map.get(x) : x)).filter(Boolean);
+  if (fav.length !== S.programs.fav.length || fav.some((x, i) => x !== S.programs.fav[i])) { S.programs.fav = fav; S.programs.favUpdated = now; pChanged = true; }
+  S.recent = S.recent.map(x => (map.has(x) ? map.get(x) : x)).filter(Boolean);
+  db.set('recent', S.recent);
+  if (nChanged) { S.notes.dirty = true; db.set('notes', S.notes); }
+  if (pChanged) { S.programs.dirty = true; db.set('programs', S.programs); }
+  if (S.current && map.has(S.current)) S.current = map.get(S.current);
+  S.context.list = S.context.list.map(x => (map.has(x) ? map.get(x) : x)).filter(Boolean);
+}
+
+/** GitHub'da tek commit ile uygula. Klasördeki gönderilmemiş değişiklikler önce gönderilir. */
+async function commitFolderChange(songs, changes, message) {
+  const g = gh();
+  if (!g.ok) return true;                       // GitHub yok: sadece bu cihazda
+  if (!navigator.onLine) { toast(t('needOnline')); return false; }
+  if (songs.some(r => r.dirty || !r.s)) {
+    await sync({ quiet: true });
+    if (songs.some(r => S.songs.get(r.p) && (S.songs.get(r.p).dirty || !S.songs.get(r.p).s))) { toast(t('syncFirst')); return false; }
+    for (const c of changes) if (c.fromP) c.sha = S.songs.get(c.fromP).s;
+  }
+  try {
+    S.sync.busy = true; updateSyncDot();
+    await g.commitBatch(changes.map(({ path, sha, delete: del }) => ({ path, sha, delete: del })), message,
+      (i, n) => toast(`⟳ ${i}/${n}`));
+    return true;
+  } catch (e) {
+    console.error(e); toast(t('syncError', { msg: e.message })); return false;
+  } finally { S.sync.busy = false; updateSyncDot(); }
+}
+
+async function renameFolder(d) {
+  if (VIEW_ONLY) { toast(t('viewOnly')); return; }
+  const input = await promptText(t('renameFolderPrompt'), d.includes('/') ? baseName(d) : d);
+  if (!input) return;
+  const clean = input.split('/').map(x => x.replace(/[\\:*?"<>|]/g, '').trim()).filter(Boolean).join('/');
+  if (!clean) return;
+  // "/" içeriyorsa kökten tam yol (taşıma), yoksa aynı yerde yeni ad
+  const nd = input.includes('/') ? clean : (dirName(d) ? dirName(d) + '/' : '') + clean;
+  if (nd === d) return;
+  if (nd.startsWith(d + '/')) { toast(t('folderIntoItself')); return; }
+  if (S.dirs.has(nd) && countIn(nd)) { toast(t('folderExists')); return; }
+  const songs = songsUnder(d);
+  const moves = songs.map(r => [r.p, nd + r.p.slice(d.length)]);
+  const changes = [];
+  for (const [a, b] of moves) {
+    const r = S.songs.get(a);
+    changes.push({ path: 'repertuar/' + b, sha: r.s, fromP: a }, { path: 'repertuar/' + a, delete: true });
+  }
+  if (songs.length && !(await commitFolderChange(songs, changes, `Klasör: ${d} → ${nd}`))) return;
+  // yerel uygula
+  const puts = [], dels = [];
+  for (const [a, b] of moves) {
+    const r = S.songs.get(a);
+    const nr = decorate({ p: b, t: r.t, e: r.e, n: r.n, s: r.s, dirty: gh().ok ? false : r.dirty, m: Date.now(),
+      ...(gh().ok && r.s ? { up: r.s, upAt: Date.now() } : {}) });   // eski paket gelirse silinmesin
+    S.songs.set(b, nr); S.songs.delete(a); puts.push(strip(nr)); dels.push(a);
+  }
+  await db.deleteSongs(dels); await db.putSongs(puts);
+  markRemoved(dels);
+  for (const v of [...S.virtualDirs]) if (v === d || v.startsWith(d + '/')) { S.virtualDirs.delete(v); S.virtualDirs.add(nd + v.slice(d.length)); }
+  if (!songs.length) S.virtualDirs.add(nd);
+  await saveVirtualDirs();
+  remapPaths(new Map(moves));
+  rebuildIndex(); goDir(nd); scheduleSync(800);
+  toast(t('folderRenamed', { n: songs.length }));
+  if (S.current && $('editor').hidden) renderSong();
+}
+
+async function deleteFolder(d) {
+  if (VIEW_ONLY) { toast(t('viewOnly')); return; }
+  const songs = songsUnder(d);
+  if (!(await confirmBox(t('confirmDeleteFolder', { name: d, n: songs.length })))) return;
+  if (songs.length > 20) {
+    const typed = await promptText(t('typeToConfirm', { name: baseName(d) }), '');
+    if (!typed || typed.trim() !== baseName(d)) { toast(t('cancelled')); return; }
+  }
+  const changes = songs.filter(r => r.s).map(r => ({ path: 'repertuar/' + r.p, delete: true }));
+  if (changes.length && !(await commitFolderChange(songs.filter(r => r.s), changes, `Klasör silindi: ${d} (${songs.length} şarkı)`))) return;
+  const dels = songs.map(r => r.p);
+  for (const p of dels) S.songs.delete(p);
+  await db.deleteSongs(dels);
+  markRemoved(dels);
   for (const v of [...S.virtualDirs]) if (v === d || v.startsWith(d + '/')) S.virtualDirs.delete(v);
   await saveVirtualDirs();
-  rebuildIndex();
-  goDir(dirName(d));
+  remapPaths(new Map(dels.map(p => [p, null])));
+  if (S.current && !S.songs.has(S.current)) { S.current = null; $('song').hidden = true; renderEmpty(); }
+  rebuildIndex(); goDir(dirName(d)); scheduleSync(800);
+  toast(t('folderDeleted', { n: songs.length }));
 }
 
 // ------------------------------------------------------------------ şarkı görünümü
@@ -960,6 +1075,7 @@ async function mergeBundle(bundle) {
   }
   for (const [p, r] of remote) {
     if (S.songs.has(p)) continue;
+    if (S.removed[p] && Date.now() - S.removed[p] < REMOVED_TTL) continue;   // az önce taşındı/silindi
     const rec = decorate({ p, t: r.t, e: r.e, n: r.n || 0, s: r.s, m: Date.now() });
     S.songs.set(p, rec); puts.push(rec);
   }
@@ -1301,6 +1417,7 @@ async function start() {
     loadSettingsReliably(), db.get('programs'), db.get('recent'), db.get('lastSync'), db.get('bundleSha'), db.allSongs(), db.get('virtualDirs'), db.get('notes'),
   ]);
   if (notes && notes.notes) S.notes = notes;
+  try { S.removed = (await db.get('removed')) || {}; } catch (_) {}
   if (Array.isArray(vdirs)) S.virtualDirs = new Set(vdirs);
   if (settings) S.settings = { ...S.settings, ...settings, gh: { ...S.settings.gh, ...(settings.gh || {}) } };
   if (programs) S.programs = { ...S.programs, ...programs };

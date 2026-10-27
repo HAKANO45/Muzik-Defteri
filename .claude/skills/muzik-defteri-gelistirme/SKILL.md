@@ -48,6 +48,9 @@ Uygulama veya araçlar hiçbir söz sitesinden içerik çekmez/kazımaz (scrapin
 
 Programlar: `{ programs: [{id, name, items:[p], updated, deleted?}], fav: [p], favUpdated }` — senkronda id + `updated` ile birleştirilir; silinen program iz olarak kalır.
 
+## Klasör işlemleri
+`renameFolder` / `deleteFolder` → `commitFolderChange` → `GitHub.commitBatch` (Git Data API: ref → commit → trees(base_tree, 2000'lik parçalar, silme = sha:null) → commit → PATCH ref). Önce klasördeki gönderilmemiş şarkılar senkronlanır. Yerelde `remapPaths()` notlar/programlar/favoriler/son açılanları günceller; `markRemoved()` eski paketin eski yolları geri getirmesini 15 dk engeller. Test: `tools/e2e-folders-ops.js`.
+
 ## Senkron akışı (`sync()` — sıra önemli)
 1. `bundle/repertuar.json.gz` sha'sı değiştiyse indir → `mergeBundle()`. Gönderilmemiş yerel değişiklik **her zaman korunur**; içeriği paketle aynıysa temiz sayılır (ZIP ile içe aktarılan 15 bin dosya böylece yeniden gönderilmez).
 2. `dirty` kayıtları tek tek PUT/DELETE (sha çakışmasında son yazan kazanır). 50'den fazlaysa onay ister; sessiz senkronda göndermez.

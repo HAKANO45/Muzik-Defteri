@@ -82,6 +82,7 @@ input, textarea, select { font: inherit; color: var(--text); }
 .side-head .spacer { flex: 1; }
 .small-btn { height: 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--gold); padding: 0 10px; font-size: 13px; }
 .small-btn:hover { border-color: var(--gold-dim); }
+.small-btn.danger-btn { color: var(--danger); }
 
 .list { flex: 1; overflow-y: auto; padding: 0 8px calc(16px + var(--safe-b)); -webkit-overflow-scrolling: touch; }
 .item {

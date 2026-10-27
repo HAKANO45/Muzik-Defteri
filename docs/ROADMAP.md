@@ -1,5 +1,10 @@
 # Yol haritası
 
+## v4.6.0 — tamam
+- Klasör düzenleme (Windows/Mac/iPad): ✎📁 yeniden adlandır veya taşı ("Arabesk/Müslüm Gürses" gibi tam yol), 🗑📁 sil (20+ şarkıda klasör adını yazarak onay)
+- GitHub'da tek commit (Git Data API): içerik yeniden yüklenmez, 13 bin şarkılık klasör bile birkaç saniyede; favori/not/program yolları otomatik güncellenir
+- Eski paket koruması: taşınan/silinen yollar 15 dk geri gelmez
+
 ## v4.5.2 — tamam
 - Etiket sırası kullanıcıya göre: 🎤 Solist · 🎵 Ton · BPM 90 (emojisiz) · 🥁 Style · kısa not
 
