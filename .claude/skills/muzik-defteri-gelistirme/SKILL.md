@@ -13,6 +13,7 @@ Windows 11 (Edge/Chrome), iPad ve iPhone (Safari) üzerinde **tek kod** ile çal
 - Arayüz **Türkçe + İngilizce**. Her yeni metin `js/i18n.js` içinde **iki dile birden** eklenir; koda düz metin yazılmaz, `t('anahtar')` kullanılır.
 - Üst çubukta **dijital saat** her zaman görünür; sahne modunda da saat var.
 - Sade arayüz. Derleme adımı yok (bundler, npm bağımlılığı yok) — saf ES modülleri. GitHub Pages doğrudan depo kökünü yayınlar.
+- Ton yazımı: **LAm, REm, FA#m, SI♭** (nota büyük, minör küçük m) — `tonLabel()`; veride `Lam` saklanır, gösterimde çevrilir.
 - **iPhone sadece görüntüleme** (`VIEW_ONLY`, user‑agent ile; yatay iPhone dahil). Şarkı ekleme/düzenleme/silme/klasör/içe aktarma yalnız Windows, MacBook, iPad. Yeni düzenleme özelliği eklersen `VIEW_ONLY` ile gizle ve fonksiyonun başına koruma koy. "İnternette ara" iPhone'da da var.
 - Şarkı sözleri bu **public** depoya ASLA girmez. Sözler `HAKANO45/-Muzik-Defteri-Repertuar` (private) deposundadır. Test verisi gerekiyorsa uydurma metin kullan.
 

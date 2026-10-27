@@ -6,7 +6,7 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '4.5.0';
+export const VERSION = '4.5.1';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -158,13 +158,15 @@ function renderTabs() {
 
 // ------------------------------------------------------------------ şarkı notu (solist, ton, kısa not)
 const NOTES = ['Do', 'Do#', 'Re', 'Mi♭', 'Mi', 'Fa', 'Fa#', 'Sol', 'Sol#', 'La', 'Si♭', 'Si'];
+/** Ton gösterimi: nota büyük harf + minör küçük "m" → LAm, REm, FA#m, SI♭ (kullanıcı tercihi). */
+function tonLabel(ton) { const m = /^(.*?)(m?)$/.exec(ton || ''); return m ? m[1].toUpperCase() + m[2] : ton; }
 function noteOf(p) { const n = S.notes.notes[p]; return n && !n.deleted && (n.solist || n.ton || n.not || n.bpm || n.style) ? n : null; }
 function noteChips(n, small) {
   if (!n) return [];
   return [
     n.solist ? h('span', { class: 'chip chip-solist' + (small ? ' sm' : '') }, '🎤 ' + n.solist) : null,
     n.bpm ? h('span', { class: 'chip chip-bpm' + (small ? ' sm' : '') }, '⏱ ' + n.bpm + (small ? '' : ' BPM')) : null,
-    n.ton ? h('span', { class: 'chip chip-ton' + (small ? ' sm' : '') }, '🎵 ' + n.ton) : null,
+    n.ton ? h('span', { class: 'chip chip-ton' + (small ? ' sm' : '') }, '🎵 ' + tonLabel(n.ton)) : null,
     n.style && !small ? h('span', { class: 'chip chip-style' }, '🥁 ' + n.style) : null,
     n.not && !small ? h('span', { class: 'chip chip-not' }, n.not) : null,
   ].filter(Boolean);
@@ -189,7 +191,7 @@ function openNoteDialog(p) {
       solistIn.value = !v ? s : v.split(/\s*&\s*/).includes(s) ? v : v + ' & ' + s;
     } }, s)));
   const m = /^(.*?)(\s*m)?$/.exec(cur.ton || '');
-  const tonSel = h('select', { class: 'field' }, h('option', { value: '' }, '—'), ...NOTES.map(n => h('option', { value: n, selected: m && m[1] === n }, n)));
+  const tonSel = h('select', { class: 'field' }, h('option', { value: '' }, '—'), ...NOTES.map(n => h('option', { value: n, selected: m && m[1] === n }, tonLabel(n))));
   const minor = h('input', { type: 'checkbox', checked: !!(m && m[2]) });
   const notIn = h('input', { class: 'field', value: cur.not || '', placeholder: t('notePlaceholder'), maxlength: 80 });
   const bpmIn = h('input', { class: 'field', type: 'number', inputmode: 'numeric', min: 30, max: 300, value: cur.bpm || '', placeholder: '96' });

@@ -1,5 +1,8 @@
 # Yol haritası
 
+## v4.5.1 — tamam
+- Ton gösterimi kullanıcı tercihine göre: nota büyük harf + minör "m" (LAm, REm, FA#m, SI♭)
+
 ## v4.5.0 — tamam
 - Şarkı notuna ⏱ BPM (TAP ile ritimde dokunarak ölçme) ve 🥁 Style (aranjör ritim adı; daha önce yazılanlar öneri olarak gelir) eklendi
 - Sıra: 🎤 Solist · ⏱ BPM · 🎵 Ton · 🥁 Style · kısa not — başlık yanında, sahnede büyük, listede küçük (solist/BPM/ton)
