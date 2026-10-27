@@ -6,7 +6,7 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '4.5.1';
+export const VERSION = '4.5.2';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -165,8 +165,8 @@ function noteChips(n, small) {
   if (!n) return [];
   return [
     n.solist ? h('span', { class: 'chip chip-solist' + (small ? ' sm' : '') }, '🎤 ' + n.solist) : null,
-    n.bpm ? h('span', { class: 'chip chip-bpm' + (small ? ' sm' : '') }, '⏱ ' + n.bpm + (small ? '' : ' BPM')) : null,
     n.ton ? h('span', { class: 'chip chip-ton' + (small ? ' sm' : '') }, '🎵 ' + tonLabel(n.ton)) : null,
+    n.bpm ? h('span', { class: 'chip chip-bpm' + (small ? ' sm' : '') }, 'BPM ' + n.bpm) : null,
     n.style && !small ? h('span', { class: 'chip chip-style' }, '🥁 ' + n.style) : null,
     n.not && !small ? h('span', { class: 'chip chip-not' }, n.not) : null,
   ].filter(Boolean);

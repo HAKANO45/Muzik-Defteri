@@ -1,5 +1,8 @@
 # Yol haritası
 
+## v4.5.2 — tamam
+- Etiket sırası kullanıcıya göre: 🎤 Solist · 🎵 Ton · BPM 90 (emojisiz) · 🥁 Style · kısa not
+
 ## v4.5.1 — tamam
 - Ton gösterimi kullanıcı tercihine göre: nota büyük harf + minör "m" (LAm, REm, FA#m, SI♭)
 
