@@ -6,7 +6,7 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '4.7.1';
+export const VERSION = '4.8.0';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -276,6 +276,10 @@ function renderList() {
   if (S.tab === 'library') {
     // ekmek kırıntısı
     const parts = S.dir ? S.dir.split('/') : [];
+    // telefonda büyük 🏠 ve ‹ Üst klasör düğmeleri
+    if (S.dir) head.append(h('div', { class: 'nav-row only-narrow' },
+      h('button', { class: 'nav-pill', onclick: goHome }, '⌂ ' + t('root')),
+      S.dir ? h('button', { class: 'nav-pill', onclick: () => goDir(dirName(S.dir)) }, '‹ ' + t('upFolder')) : ''));
     head.append(h('button', { class: 'crumb', onclick: () => goDir('') }, t('root')));
     parts.forEach((part, i) => {
       head.append(h('span', { class: 'crumb-sep' }, '›'));
@@ -348,6 +352,16 @@ function renderList() {
     ] }));
   });
   if (!prog.items.length) list.append(h('div', { class: 'list-note' }, t('emptyProgram')));
+}
+
+/** 🏠: şarkıyı kapat, aramayı temizle, ana klasöre dön (iPhone'da liste ekranı) */
+function goHome() {
+  stopScroll();
+  if (!$('stage').hidden) closeStage();
+  $('editor').hidden = true;
+  setNarrowSong(false);
+  S.programId = null;
+  goDir('');
 }
 
 function goDir(d) { S.dir = d; S.tab = 'library'; S.limit = 300; $('q').value = ''; saveUi(); renderList(); $('list').scrollTop = 0; }
@@ -1356,6 +1370,7 @@ function bind() {
     if (S.tab !== 'programs') S.programId = null;
     saveUi(); renderList(); $('list').scrollTop = 0;
   });
+  $('btnHome').addEventListener('click', goHome);
   $('btnBack').addEventListener('click', () => { stopScroll(); setNarrowSong(false); $('editor').hidden = true; if (S.current) renderSong(); });
   $('btnSettings').addEventListener('click', openSettings);
   $('btnPanel').addEventListener('click', () => togglePanel());

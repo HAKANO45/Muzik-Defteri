@@ -90,6 +90,10 @@ input, textarea, select { font: inherit; color: var(--text); }
 .tabs button.active { background: var(--gold); color: #111; border-color: var(--gold); font-weight: 600; }
 
 .side-head { padding: 4px 12px 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--text2); font-size: 13px; }
+.nav-row { display: none; width: 100%; gap: 8px; margin-bottom: 4px; }
+.nav-pill { height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--gold-dim); background: #1a1710; color: var(--gold2); font-size: 17px; font-weight: 700; }
+.nav-pill:first-child { background: var(--gold); color: #111; border-color: var(--gold); }
+.home-btn { font-size: 24px; }
 .crumb { background: none; border: none; color: var(--gold); padding: 4px 2px; font-size: 13px; }
 .crumb-sep { color: var(--gold-dim); }
 .side-head .spacer { flex: 1; }
@@ -203,6 +207,7 @@ input, textarea, select { font: inherit; color: var(--text); }
 @media (max-width: 820px) {
   .layout, .layout.side-hidden { grid-template-columns: 1fr; }
   .splitter, .only-wide, .list-size { display: none !important; }
+  .nav-row { display: flex; }
   .layout.side-hidden .sidebar { display: flex; }
   .layout.show-song .sidebar { display: none !important; }
   .layout:not(.show-song) .viewer { display: none; }

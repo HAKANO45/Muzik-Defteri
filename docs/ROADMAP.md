@@ -1,5 +1,8 @@
 # Yol haritası
 
+## v4.8.0 — tamam
+- iPhone / dar ekran: üst çubukta ⌂ (ana klasöre dön, şarkıyı kapatır, aramayı temizler); klasör içindeyken büyük "⌂ Repertuvar" ve "‹ Üst klasör" düğmeleri
+
 ## v4.7.1 — tamam
 - Taşınmış/silinmiş şarkının eski notu senkronda geri yüklenmiyor
 
