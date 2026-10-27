@@ -1,5 +1,9 @@
 # Yol haritası
 
+## v5.8.0 — tamam (önizlemeyle onaylandı)
+- Görünüm → Yazım: klasör adları / şarkı adları / sözler için Olduğu gibi · BÜYÜK HARF · Baş Harfler Büyük (sözlerde Normal yazı). Sadece görünüş (`caseText`, `showTitle`, `showFolder`), Türkçe kural, gorunum.json ile senkron.
+- Sırada: 🔤 Düzelt, 🧹 Kopya tarama, ayarlar a–f (çöp kutusu, yedek ZIP, açılış, pedal, kopya uyarısı, okunaklı yazı), GitHub Desktop yardımı.
+
 ## v5.7.0 — tamam (önizlemeyle onaylandı)
 - Klasör ağacı: klasöre tek dokunuş içini hemen altında açar/kapatır (▸/▾, girinti); çift dokunuş → menü (Aç = klasör sayfası). Açık klasörler hatırlanır (`md.openDirs`); ⌂ hepsini kapatır.
 - ⌂ geniş ekranlarda da (Mac, iPad, Windows).
