@@ -1,5 +1,9 @@
 # Yol haritası
 
+## v5.6.0 — tamam (önizlemeyle onaylandı)
+- Programlar'da ↕ Sırala: programların sırası (`programlar.json` → `order`, `orderUpdated`) ve program içi şarkı sırası büyük ▲▼✕ ile; normal görünümde küçük oklar kalktı.
+- 5.5.1: 🔗 düğmesi eski önbellekli index.html'de de eklenir.
+
 ## v5.5.0 — tamam (önizlemeyle onaylandı)
 - 🔗 Ortak Sahne: iki cihaz aynı oda koduyla bağlanır; biri şarkı açınca öteki de açar (karşılıklı / takip et / ben yönetirim). Aracı ntfy.sh (SSE + POST), sadece şarkı yolu gider. Oda kodu data deposunda `sahne.json`. Kapalıyken hiçbir şey yapmaz; internet koparsa sadece takip durur. Gerçek ntfy ile saha testi bekliyor.
 
