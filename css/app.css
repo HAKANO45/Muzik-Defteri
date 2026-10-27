@@ -455,3 +455,10 @@ input, textarea, select { font: inherit; color: var(--text); }
 .item.tree-dir.open .name { color: var(--gold2); font-weight: 700; }
 .item.tree-song { position: relative; }
 .tree-more { margin: 8px 10px 8px calc(10px + var(--lvl, 0) * 26px * var(--ui)); }
+
+/* Yazım önizlemesi */
+.case-prev { border: 1px solid var(--gold-dim); border-radius: 12px; padding: 6px 8px; margin: 10px 0 4px; background: var(--soft); }
+.case-row { padding: 6px; border-bottom: 1px solid var(--divider); font-size: calc(15px * var(--ui)); }
+.case-row:last-child { border-bottom: none; }
+.case-row.lyr { color: var(--gold2); font-style: italic; }
+.case-note { font-size: calc(13px * var(--ui)); opacity: .75; }

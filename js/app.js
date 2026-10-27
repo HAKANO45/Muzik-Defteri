@@ -6,7 +6,7 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '5.7.0';
+export const VERSION = '5.8.0';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -270,7 +270,7 @@ function mergeNotes(local, remote) {
 function songItem(p, { sub, html, acts, ctx, tapMenu } = {}) {
   const rec = S.songs.get(p);
   const missing = !rec || rec.del;
-  const title = missing ? baseName(p).replace(/\.txt$/i, '') + ' ' + t('missingSong') : rec._title;
+  const title = missing ? baseName(p).replace(/\.txt$/i, '') + ' ' + t('missingSong') : showTitle(rec._title);
   const tags = missing ? [] : rec._tags.map(x => h('span', { class: 'tag' }, x));
   const subEl = html ? h('span', { class: 'sub', html }) : h('span', { class: 'sub' }, sub != null ? sub : dirName(p) || t('root'));
   const el = h('div', { class: 'item' + (p === S.current ? ' active' : ''), role: 'button', tabindex: 0, 'data-p': p,
@@ -307,7 +307,7 @@ function renderTree(list, dir, level) {
         onkeydown: e => { if (e.key === 'Enter') toggleDir(d); } },
       h('span', { class: 'chev' }, open ? '▾' : '▸'),
       h('span', { class: 'ico' }, open ? '📂' : '📁'),
-      h('span', { class: 'main' }, h('span', { class: 'name' }, baseName(d))),
+      h('span', { class: 'main' }, h('span', { class: 'name' }, showFolder(baseName(d)))),
       h('span', { class: 'count' }, countIn(d)));
     addTaps(row, () => toggleDir(d), () => openFolderSheet(d)); addLongPress(row, () => openFolderSheet(d));
     list.append(row);
@@ -364,7 +364,7 @@ function selectItem(p) {
   return h('div', { class: 'item sel-item' + (on ? ' selected' : ''), role: 'button', tabindex: 0,
       onclick: () => { on ? S.sel.delete(p) : S.sel.add(p); renderList(); } },
     h('span', { class: 'sel-box' }, on ? '✓' : ''),
-    h('span', { class: 'main' }, h('span', { class: 'name' }, rec ? rec._title : baseName(p))));
+    h('span', { class: 'main' }, h('span', { class: 'name' }, rec ? showTitle(rec._title) : baseName(p))));
 }
 
 function renderEditBar(head) {
@@ -395,7 +395,7 @@ function openSongSheetList(p, ctx) {
   const act = (icon, label, fn, cls = '') => h('button', { class: 'sheet-act ' + cls, onclick: () => { closeModal(); fn(); } },
     h('span', { class: 'sheet-ico' }, icon), h('span', {}, label));
   modal(h('div', { class: 'sheet-grab' }),
-    h('div', { class: 'sheet-title' }, '♪ ' + rec._title),
+    h('div', { class: 'sheet-title' }, '♪ ' + showTitle(rec._title)),
     h('div', { class: 'sheet-grid folder-acts' },
       act('📂', t('open'), () => openSong(p, ctx)),
       act('☑', t('selectTitle'), () => { S.sel = new Set([p]); renderList(); }),
@@ -516,7 +516,7 @@ function renderList() {
     parts.forEach((part, i) => {
       head.append(h('span', { class: 'crumb-sep' }, '›'));
       const d = parts.slice(0, i + 1).join('/');
-      head.append(h('button', { class: 'crumb', onclick: () => goDir(d) }, part));
+      head.append(h('button', { class: 'crumb', onclick: () => goDir(d) }, showFolder(part)));
     });
     if (S.sel || S.sortMode) { renderEditBar(head); }
     else head.append(...[h('span', { class: 'spacer' }),
@@ -536,7 +536,7 @@ function renderList() {
       const row = h('div', { class: 'item' + (S.sortMode ? ' sorting' : ''), role: 'button', tabindex: 0,
           onkeydown: e => { if (e.key === 'Enter') goDir(d); } },
         h('span', { class: 'ico' }, '📁'),
-        h('span', { class: 'main' }, h('span', { class: 'name' }, baseName(d))),
+        h('span', { class: 'main' }, h('span', { class: 'name' }, showFolder(baseName(d)))),
         S.sortMode ? moveBtns(d) : h('span', { class: 'count' }, countIn(d)));
       if (!S.sortMode && !S.sel) { addTaps(row, () => goDir(d), () => openFolderSheet(d)); addLongPress(row, () => openFolderSheet(d)); }
       list.append(row);
@@ -985,9 +985,10 @@ async function openLinkSheet() {
 function lyricsHtml(text) {
   // eski DOS dosyalarının sonundaki dosya‑sonu işareti (Ctrl‑Z, 0x1A) ve diğer görünmez kontrol karakterleri ekranda ⊠ gibi çıkmasın (dosyaya dokunulmaz)
   text = text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/\s+$/, '');
+  const cl = look().caseLyrics;
   return text.split('\n').map(line => {
     if (line.trim() && isChordLine(line)) return '<span class="chord">' + escapeHtml(transposeLine(line, S.transpose)) + '</span>';
-    return escapeHtml(line);
+    return escapeHtml(caseText(line, cl));
   }).join('\n');
 }
 
@@ -1031,14 +1032,14 @@ function renderSong() {
     tbBtn('▴', t('hideToolbar'), () => setCompact(true)),
   ].filter(Boolean));
   renderPhoneBar(rec, idx);
-  $('songTitle').textContent = rec._title;
+  $('songTitle').textContent = showTitle(rec._title);
   $('songNote').replaceChildren(...noteChips(noteOf(rec.p)),
     h('button', { class: 'chip chip-add', title: t('songNote'), onclick: () => openNoteDialog(rec.p) }, noteOf(rec.p) ? '✎' : '＋ ' + t('songNote')));
   const meta = $('songMeta'); meta.replaceChildren();
   const d = dirName(rec.p);
   if (idx >= 0) meta.append(h('span', { class: 'pos only-phone' }, `${idx + 1}/${S.context.list.length}`));
   // sade bilgi satırı: sadece bulunduğu klasörün adı (tam yol değil) + usul/makam etiketi
-  meta.append(h('button', { class: 'meta-folder', title: d || t('root'), onclick: () => goDir(d) }, '📁 ' + (d ? baseName(d) : t('root'))));
+  meta.append(h('button', { class: 'meta-folder', title: d || t('root'), onclick: () => goDir(d) }, '📁 ' + (d ? showFolder(baseName(d)) : t('root'))));
   for (const tg of rec._tags) meta.append(h('span', { class: 'tag' }, tg));
   if (rec.dirty) meta.append(h('span', { title: t('pending', { n: 1 }) }, '✱'));
   // kopya bilgisi sadece düzenleme yapılan cihazlarda (iPhone'da gizli)
@@ -1083,7 +1084,7 @@ function openSongSheet(rec) {
     h('button', { class: 'pb-btn', onclick: minus }, '−'), valEl, h('button', { class: 'pb-btn', onclick: plus }, '+'));
   modal(
     h('div', { class: 'sheet-grab' }),
-    h('div', { class: 'sheet-title' }, rec._title),
+    h('div', { class: 'sheet-title' }, showTitle(rec._title)),
     // Not (solist · ton · BPM · style · not) — iPhone'da da düzenlenebilir (söz değil)
     h('button', { class: 'sheet-note-btn', onclick: () => { closeModal(); openNoteDialog(rec.p); } },
       h('span', { class: 'sheet-note-head' }, '🏷 ' + t('songNote') + ' — 🎤 ' + t('solist') + ' · 🎵 ' + t('ton') + ' · BPM · 🥁 Style'),
@@ -1204,7 +1205,7 @@ function closeStage() {
 }
 function renderStage() {
   const rec = S.songs.get(S.current); if (!rec) return;
-  $('stageTitle').textContent = rec._title;
+  $('stageTitle').textContent = showTitle(rec._title);
   $('stageNote').replaceChildren(...noteChips(noteOf(rec.p)));
   $('stageLyrics').innerHTML = lyricsHtml(rec.t);
   const i = S.context.list.indexOf(rec.p);
@@ -1554,6 +1555,7 @@ async function sync({ quiet = false } = {}) {
       if (gd && gd.look && (!mine || (gd.look.updated || 0) > (mine.updated || 0))) {
         S.settings.look = gd.look; if (gd.look.font) S.settings.font = gd.look.font;
         saveSettings(); applyLook(); document.documentElement.style.setProperty('--lyrics-size', S.settings.font + 'px');
+        renderList(); if (S.current && !$('song').hidden) renderSong();
       } else if (mine && mine.updated && (!gd || (mine.updated || 0) > ((gd.look || {}).updated || 0))) {
         await g.putFile('gorunum.json', new TextEncoder().encode(JSON.stringify({ format: 1, look: mine }, null, 1)), 'Görünüm güncellendi', gsha || undefined);
       }
@@ -1820,7 +1822,7 @@ function applyLang() {
 }
 
 // ------------------------------------------------------------------ görünüm (tema, düğme boyutu, düzen) — tüm cihazlara senkron
-const LOOK_DEFAULT = { theme: 'gold', ui: 1, meta: true, tags: true, phoneClock: false, font: 22, updated: 0 };
+const LOOK_DEFAULT = { theme: 'gold', ui: 1, meta: true, tags: true, phoneClock: false, font: 22, caseFolder: 'asis', caseSong: 'asis', caseLyrics: 'asis', updated: 0 };
 const THEMES = [
   ['gold', 'themeGold', ['#0b0b0b', '#d4af37', '#f2ead3']],
   ['bw', 'themeBw', ['#000000', '#ffffff', '#8a8a8a']],
@@ -1829,6 +1831,17 @@ const THEMES = [
   ['red', 'themeRed', ['#0d0606', '#e0b44a', '#f6ece6']],
 ];
 function look() { return { ...LOOK_DEFAULT, ...(S.settings.look || {}) }; }
+/** Yazım: sadece görünüş (dosyalar değişmez). Türkçe kurala göre i/İ, ı/I. */
+function caseText(x, mode) {
+  if (!x || !mode || mode === 'asis') return x;
+  if (mode === 'upper') return x.toLocaleUpperCase('tr');
+  const low = x.toLocaleLowerCase('tr');
+  if (mode === 'title') return low.replace(/(^|[\s\-–(\/.,"'“])(\p{L})/gu, (m, a, c) => a + c.toLocaleUpperCase('tr'));
+  if (mode === 'sentence') return low.replace(/^(\s*)(\p{L})/u, (m, a, c) => a + c.toLocaleUpperCase('tr'));
+  return x;
+}
+function showTitle(x) { return caseText(x, look().caseSong); }
+function showFolder(x) { return caseText(x, look().caseFolder); }
 function applyLook(L = look()) {
   const r = document.documentElement;
   if (L.theme && L.theme !== 'gold') r.dataset.theme = L.theme; else delete r.dataset.theme;
@@ -1848,11 +1861,19 @@ function openAppearance() {
     class: 'theme-sw' + (L.theme === id ? ' on' : ''), style: `background:${cols[0]};color:${cols[2]}`,
     onclick: e => { L.theme = id; for (const b of sw.children) b.classList.remove('on'); e.currentTarget.classList.add('on'); applyLook(L); } },
     h('div', { class: 'sw-bar' }, ...cols.map(c => h('i', { style: `background:${c};border:1px solid ${cols[1]}` }))), h('b', {}, t(label)))));
+  const prevBox = h('div', { class: 'case-prev' });
+  const casePrev = () => {
+    const sample = [['📁', 'caseFolder', '9-8 Roman', 0], ['📁', 'caseFolder', 'EGE YÖRESI', 1], ['♪', 'caseSong', 'Abe kaynana neyap', 2], ['♪', 'caseSong', 'KARA GÖZLÜ CİNGENEM', 2], ['♪', 'caseSong', 'iC iC KUDUR', 2]];
+    prevBox.replaceChildren(...sample.map(([i, k, x, lv]) => h('div', { class: 'case-row', style: `padding-left:${lv * 22 + 6}px` }, i + ' ' + caseText(x, L[k]))),
+      h('div', { class: 'case-row lyr' }, caseText('Sevenleri sevdiğine vermezler', L.caseLyrics)));
+  };
+  casePrev();
   const cancel = () => { applyLook(before); document.documentElement.style.setProperty('--lyrics-size', S.settings.font + 'px'); closeModal(); };
   const save = () => {
     S.settings.look = { ...L, updated: Date.now() };
     S.settings.font = L.font; document.documentElement.style.setProperty('--lyrics-size', L.font + 'px');
     S.lookDirty = true; saveSettings(); applyLook(); closeModal(); scheduleSync(500); toast(t('lookSaved'));
+    renderList(); if (S.current && !$('song').hidden) renderSong(); if (!$('stage').hidden) renderStage();
   };
   modal(h('div', { class: 'modal-head' }, h('h2', {}, '🎨 ' + t('appearance')),
       h('button', { class: 'mh-btn mh-save', onclick: () => save() }, t('save')),
@@ -1864,6 +1885,11 @@ function openAppearance() {
     h('label', {}, t('infoLine')), seg([[true, t('show')], [false, t('hide')]], 'meta'),
     h('label', {}, t('tagsLabel')), seg([[true, t('show')], [false, t('hide')]], 'tags'),
     h('label', {}, t('phoneTop')), seg([[false, 'HAKANO REPERTUVAR'], [true, t('clockWord')]], 'phoneClock'),
+    h('h3', {}, t('caseTitle')),
+    h('label', {}, t('caseFolder')), seg([['asis', t('caseAsIs')], ['upper', t('caseUpper')], ['title', t('caseTitleCase')]], 'caseFolder', () => casePrev()),
+    h('label', {}, t('caseSong')), seg([['asis', t('caseAsIs')], ['upper', t('caseUpper')], ['title', t('caseTitleCase')]], 'caseSong', () => casePrev()),
+    h('label', {}, t('caseLyrics')), seg([['asis', t('caseAsIs')], ['upper', t('caseUpper')], ['sentence', t('caseSentence')]], 'caseLyrics', () => casePrev()),
+    prevBox, h('p', { class: 'case-note' }, t('caseNote')),
     h('p', {}, t('lookSyncNote')),
     h('div', { class: 'btn-row' }, h('button', { class: 'btn primary', onclick: save }, t('save')), h('button', { class: 'btn', onclick: cancel }, t('cancel'))));
   $('modal').onclick = e => { if (e.target === $('modal')) cancel(); };
