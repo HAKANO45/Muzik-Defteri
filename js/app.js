@@ -6,7 +6,7 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '5.6.0';
+export const VERSION = '5.6.1';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -942,6 +942,8 @@ async function openLinkSheet() {
 }
 
 function lyricsHtml(text) {
+  // eski DOS dosyalarının sonundaki dosya‑sonu işareti (Ctrl‑Z, 0x1A) ve diğer görünmez kontrol karakterleri ekranda ⊠ gibi çıkmasın (dosyaya dokunulmaz)
+  text = text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/\s+$/, '');
   return text.split('\n').map(line => {
     if (line.trim() && isChordLine(line)) return '<span class="chord">' + escapeHtml(transposeLine(line, S.transpose)) + '</span>';
     return escapeHtml(line);

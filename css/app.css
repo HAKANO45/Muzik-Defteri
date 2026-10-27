@@ -441,3 +441,9 @@ input, textarea, select { font: inherit; color: var(--text); }
 }
 
 .sort-btn.danger, .item .acts .sort-btn.danger { border-color: var(--danger) !important; color: var(--danger) !important; }
+
+/* ⌂ Ana klasör düğmesi geniş ekranlarda da (Mac, iPad, Windows) */
+@media (min-width: 601px) {
+  #btnHome.only-narrow { display: inline-flex; align-items: center; justify-content: center; min-width: calc(48px * var(--ui)); height: calc(42px * var(--ui));
+    border-radius: 12px; border: 2px solid var(--gold); background: var(--gold); color: var(--on-gold); font-size: calc(26px * var(--ui)); font-weight: 700; }
+}
