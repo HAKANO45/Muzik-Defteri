@@ -1,5 +1,9 @@
 # Yol haritası
 
+## v5.4.0 — tamam (önizlemeyle onaylandı)
+- İnternette ara sayfası: Google ayrı pencerede ("şarkı sözleri" eklenir); cihaza göre reklamsız + gece modu okuma ipuçları (iPhone/iPad Safari Okuyucu, Android Chrome Okuma modu, Windows Edge F9, Mac Safari). Uygulama içerik çekmez (yasal: kopyala‑yapıştır). Brave/Google arama API'leri değerlendirildi: Google JSON API yeni kullanıcı almıyor (1.1.2027 kapanıyor), Brave anahtarı istemcide olmamalı → ara sunucu gerekir; şimdilik yok.
+- Android telefonlar iPhone gibi: görüntüleme + not + dosya yönetimi.
+
 ## v5.3.1 — tamam (önizlemeyle onaylandı)
 - iPhone ⋯ menüsünde büyük Not düğmesi: solist, ton, BPM (TAP), style, kısa not iPhone'dan da düzenlenir (söz düzenleme hâlâ kapalı).
 
