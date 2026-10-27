@@ -6,7 +6,7 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '5.5.0';
+export const VERSION = '5.5.1';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -1857,6 +1857,9 @@ function bind() {
   $('btnHome').addEventListener('click', goHome);
   $('btnBack').addEventListener('click', () => { stopScroll(); setNarrowSong(false); $('editor').hidden = true; if (S.current) renderSong(); });
   $('btnSettings').addEventListener('click', openSettings);
+  // eski önbellekten gelen index.html'de düğme yoksa kendimiz ekleriz (sürüm karışıklığında da görünsün)
+  if (!$('btnLink')) $('btnSync').before(h('button', { class: 'icon-btn link-btn', id: 'btnLink', title: t('linkTitle') }, '🔗'));
+  if (!$('stageLink') && $('stageClock')) $('stageClock').before(h('span', { class: 'stage-link', id: 'stageLink', hidden: true }, '🔗'));
   $('btnLink').addEventListener('click', openLinkSheet);
   linkConnect();
   $('btnPanel').addEventListener('click', () => togglePanel());
