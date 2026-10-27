@@ -118,6 +118,12 @@ input, textarea, select { font: inherit; color: var(--text); }
 .chip.sm { height: 20px; padding: 0 7px; font-size: 11px; border-radius: 10px; margin-left: 6px; vertical-align: 1px; font-weight: 600; }
 .chip-solist { color: #f6e3a1; }
 .chip-ton { background: var(--gold); color: #111; border-color: var(--gold); }
+.chip-bpm { font-variant-numeric: tabular-nums; }
+.chip-style { color: #e9d9a6; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.grid3 .field[type=number] { max-width: 110px; }
+.tap-btn { height: 42px; min-width: 92px; font-family: var(--mono); letter-spacing: .05em; }
+@media (max-width: 480px) { .grid3 { grid-template-columns: 1fr; } }
 .chip-not { color: var(--text2); font-weight: 500; white-space: normal; height: auto; min-height: 28px; padding: 3px 10px; }
 .chip-add { background: transparent; border-style: dashed; color: var(--gold); cursor: pointer; font-weight: 500; }
 .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }

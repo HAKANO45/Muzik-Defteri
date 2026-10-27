@@ -6,7 +6,7 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '4.4.0';
+export const VERSION = '4.5.0';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -158,16 +158,18 @@ function renderTabs() {
 
 // ------------------------------------------------------------------ şarkı notu (solist, ton, kısa not)
 const NOTES = ['Do', 'Do#', 'Re', 'Mi♭', 'Mi', 'Fa', 'Fa#', 'Sol', 'Sol#', 'La', 'Si♭', 'Si'];
-function noteOf(p) { const n = S.notes.notes[p]; return n && !n.deleted && (n.solist || n.ton || n.not) ? n : null; }
+function noteOf(p) { const n = S.notes.notes[p]; return n && !n.deleted && (n.solist || n.ton || n.not || n.bpm || n.style) ? n : null; }
 function noteChips(n, small) {
   if (!n) return [];
   return [
     n.solist ? h('span', { class: 'chip chip-solist' + (small ? ' sm' : '') }, '🎤 ' + n.solist) : null,
+    n.bpm ? h('span', { class: 'chip chip-bpm' + (small ? ' sm' : '') }, '⏱ ' + n.bpm + (small ? '' : ' BPM')) : null,
     n.ton ? h('span', { class: 'chip chip-ton' + (small ? ' sm' : '') }, '🎵 ' + n.ton) : null,
+    n.style && !small ? h('span', { class: 'chip chip-style' }, '🥁 ' + n.style) : null,
     n.not && !small ? h('span', { class: 'chip chip-not' }, n.not) : null,
   ].filter(Boolean);
 }
-function noteSearchText(p) { const n = noteOf(p); return n ? fold([n.solist, n.ton, n.not].filter(Boolean).join(' ')) : ''; }
+function noteSearchText(p) { const n = noteOf(p); return n ? fold([n.solist, n.ton, n.not, n.style, n.bpm ? n.bpm + ' bpm' : ''].filter(Boolean).join(' ')) : ''; }
 function allSolists() {
   const c = new Map();
   for (const n of Object.values(S.notes.notes)) if (n && !n.deleted && n.solist) for (const s of n.solist.split(/\s*[&,+\/]\s*/)) if (s) c.set(s, (c.get(s) || 0) + 1);
@@ -190,16 +192,35 @@ function openNoteDialog(p) {
   const tonSel = h('select', { class: 'field' }, h('option', { value: '' }, '—'), ...NOTES.map(n => h('option', { value: n, selected: m && m[1] === n }, n)));
   const minor = h('input', { type: 'checkbox', checked: !!(m && m[2]) });
   const notIn = h('input', { class: 'field', value: cur.not || '', placeholder: t('notePlaceholder'), maxlength: 80 });
+  const bpmIn = h('input', { class: 'field', type: 'number', inputmode: 'numeric', min: 30, max: 300, value: cur.bpm || '', placeholder: '96' });
+  // Tap tempo: ritimde 4+ kez dokun → BPM
+  let taps = [];
+  const tapBtn = h('button', { class: 'btn tap-btn', onclick: () => {
+    const now = performance.now();
+    taps = taps.filter(x => now - x < 3000); taps.push(now);
+    if (taps.length >= 2) {
+      const d = (taps[taps.length - 1] - taps[0]) / (taps.length - 1);
+      bpmIn.value = Math.round(60000 / d);
+    }
+    tapBtn.textContent = 'TAP ' + '•'.repeat(Math.min(taps.length, 8));
+  } }, 'TAP');
+  const styles = [...new Set(Object.values(S.notes.notes).filter(n => n && !n.deleted && n.style).map(n => n.style))].sort();
+  const styleIn = h('input', { class: 'field', value: cur.style || '', placeholder: '8Beat Pop, Arabesk 2, Halay…', list: 'styleList', autocapitalize: 'words' });
+  const sdl = h('datalist', { id: 'styleList' }, styles.map(s => h('option', { value: s })));
   const save = () => {
     const ton = tonSel.value ? tonSel.value + (minor.checked ? 'm' : '') : '';
-    const solist = solistIn.value.replace(/\s+/g, ' ').trim(), not = notIn.value.trim();
-    S.notes.notes[p] = solist || ton || not ? { solist, ton, not, updated: Date.now() } : { deleted: true, updated: Date.now() };
+    const solist = solistIn.value.replace(/\s+/g, ' ').trim(), not = notIn.value.trim(), style = styleIn.value.replace(/\s+/g, ' ').trim();
+    let bpm = parseInt(bpmIn.value, 10); bpm = bpm >= 20 && bpm <= 400 ? bpm : 0;
+    S.notes.notes[p] = solist || ton || not || bpm || style ? { solist, bpm, ton, style, not, updated: Date.now() } : { deleted: true, updated: Date.now() };
     saveNotes(); closeModal(); renderSong(); if (!$('stage').hidden) renderStage(); renderList();
     toast(t('saved'));
   };
   modal(h('h2', {}, '🏷 ' + t('songNote')),
     h('label', {}, t('solist')), solistIn, dl, quick,
-    h('label', {}, t('ton')), h('div', { class: 'ton-row' }, tonSel, h('label', { class: 'toggle' }, minor, h('span', {}, t('minor')))),
+    h('div', { class: 'grid3' },
+      h('div', {}, h('label', {}, 'BPM'), h('div', { class: 'ton-row' }, bpmIn, tapBtn)),
+      h('div', {}, h('label', {}, t('ton')), h('div', { class: 'ton-row' }, tonSel, h('label', { class: 'toggle' }, minor, h('span', {}, 'm'))))),
+    h('label', {}, 'Style'), styleIn, sdl,
     h('label', {}, t('shortNote')), notIn,
     h('div', { class: 'btn-row' }, h('button', { class: 'btn primary', onclick: save }, t('save')), h('button', { class: 'btn', onclick: closeModal }, t('cancel'))));
   setTimeout(() => solistIn.focus(), 30);

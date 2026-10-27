@@ -34,7 +34,10 @@ async function setup(browser, opts) {
   await page.click('#songNote .chip-add');
   await page.fill('.modal-card input.field >> nth=0', 'Eylem');
   await page.selectOption('.modal-card select', 'La'); await page.check('.modal-card .ton-row input[type=checkbox]');
-  await page.fill('.modal-card input.field >> nth=1', 'kapo 2, yavaş başla');
+  await page.fill('.modal-card input.field >> nth=1', '96');
+  await page.fill('.modal-card input.field >> nth=2', 'Arabesk 2');
+  await page.fill('.modal-card input.field >> nth=3', 'kapo 2, yavaş başla');
+  await page.screenshot({ path: OUT + '/notes-ipad-dialog.png' });
   await page.click('.modal-card >> text=Kaydet'); await page.waitForTimeout(300);
   console.log('chips:', await page.locator('#songNote').innerText());
   await page.screenshot({ path: OUT + '/notes-ipad-song.png' });
