@@ -25,9 +25,8 @@ let gor = null; const puts = [];
   await page.screenshot({ path: (process.env.OUT || '/tmp') + '/lk2.png' });
   await page.click('.btn-row >> text=Kaydet'); await page.waitForTimeout(2500);
   console.log('gorunum.json yüklendi:', gor ? gor.toString().slice(0, 120) : null);
-  await page.locator('.item', { hasText: '1.Oyun Havalari' }).first().click();
-  await page.locator('.item', { hasText: '2-4 europub' }).first().click();
-  await page.locator('#list .item').nth(1).click(); await page.waitForTimeout(300);
+  await page.evaluate(() => window.__mdGo('Oyun Havalari/2-4 europub')); await page.waitForTimeout(300);
+  await page.locator('#list .item[data-p]').nth(1).click(); await page.waitForTimeout(300);
   await page.screenshot({ path: (process.env.OUT || '/tmp') + '/lk3.png' });
   // 2. cihaz: senkronla gelir mi
   const p2 = await (await b.newContext({ viewport: { width: 1366, height: 860 } })).newPage();
