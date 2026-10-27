@@ -19,15 +19,12 @@ legacy/               eski VB6 programı (sadece referans)
 .github/workflows/bundle.yml  repertuar/** değişince paketi yeniden üretir
 ```
 
-## Klasör yapısı (27.10.2026 temiz defter — bozma)
-- `Sanatçılar/<Sanatçı>/` — sanatçısı bilinen şarkılar. Ad doğru Türkçe yazımla (Müslüm Gürses, İbrahim Tatlıses).
-- Tür klasörleri: `Oyun Havaları/<Halay|Roman|Kasap|Oryantal - Çiftetelli|Ankara|Zeybek - Ege|Rumeli|Kına|Karışık>`, `Türk Halk Müziği/[Uşşak|Kürdi|Hicaz|Nihavent|5-8|…|Uzun Hava]`, `Türk Sanat Müziği`, `Pop`, `Slow`, `Karadeniz`, `Nostalji`, `Vals`, `Azeri`, `Fantezi`, `Dans`, `Şiir`.
-- `Karışık (türü belirsiz)/` — sanatçısı/türü henüz bilinmeyenler; araştırıldıkça Sanatçılar'a veya tür klasörüne taşınır.
-- `Diğer dosyalar (doc, pptx)/` — uygulamada görünmez.
-- Eski set klasörleri (Sahne 112, Ceza Evi Program…) artık klasör değil, `programlar.json` içinde program.
-- Kopya yok: yeni şarkı eklemeden önce aynı metin var mı kontrol et (tools/kopya_raporu.py).
-- Dosya adı = şarkı adı (sanatçı adı dosya adına yazılmaz, klasörden gelir). Windows'ta yasak karakterler `\ / : * ? " < > |` kullanılmaz.
-- Düzenleme öncesi tam arşiv: `eski-arsiv-2026-10-27` dalında. Düzenleme aracı: `tools/duzenle.py`, taşıma listesi: `rapor/duzenleme_tasima.csv`.
+## Klasör yapısı (kullanıcı kararı 27.10.2026 sabah — bozma)
+- **Eski klasör düzeni aynen geçerli** (`Türküler`, `1.Oyun Havalari`, `2.Slov Fantazi Tsm`, `Halay`, `KINA`, `Yeni/MUSTY-2016/…`, `Yeni/DÜĞÜN/…`, `muzik2` …). Kopyalar dahil, kullanıcı kendisi düzeltecek. **Toplu otomatik yeniden düzenleme, kopya silme, toplu taşıma YAPMA** — kullanıcı açıkça istemedikçe.
+- Ek olarak `Sanatçılar/<Sanatçı>/` klasörü var (56 sanatçı, 2.266 şarkı; Türkçe harfleri düzeltilmiş kopyalar). Kullanıcı bunu tutmak istedi.
+- Usul dosya/klasör adının başında (`5-8 SARI GELIN.TXT`, `9-8/…`), makam klasörleri (`01.Ussak` …) → uygulama etiketleri.
+- Dosya adı = şarkı adı. Windows'ta yasak karakterler `\ / : * ? " < > |` kullanılmaz.
+- Geçmiş: 27.10 gece temiz deftere geçildi (tools/duzenle.py) → kullanıcı parçaları bulamadı → sabah eski düzene dönüldü (tools/eski_duzen_geri.py). Eski arşiv `eski-arsiv-2026-10-27` dalında.
 
 ## Taşıma / silme kuralı
 Bir şarkı dosyası taşınır, yeniden adlandırılır veya kopyası silinirse `programlar.json` (items + fav) ve `notlar.json` içindeki eski yollar **aynı commit'te** yeni/kalan yola çevrilir. Hiçbir program şarkı, hiçbir not sahibini kaybetmez.
