@@ -52,6 +52,8 @@ Uygulama veya araçlar hiçbir söz sitesinden içerik çekmez/kazımaz (scrapin
 
 Ortak Sahne (`openLinkSheet`, `linkConnect`, `linkSend`, durum `L`): ntfy.sh konusu `hakano-sahne-<oda>`; mesaj `{p, by, id, t}` — asla söz gönderme. `openSong` sonunda `linkSend`; uzaktan açılışta `L.applying` döngüyü engeller. Test: `tools/e2e-link.js` (ntfy taklit).
 
+Kütüphane listesi ağaçtır (`renderTree`, `toggleDir`, `openDirs`): tek dokunuş klasörü yerinde açar; Sırala/Seç modları sadece `S.dir` düz listesi. Testlerde klasöre girmek: `page.evaluate(() => window.__mdGo('KINA'))`.
+
 Sıralama: `siralama.json` → klasör başına ad listesi (`orderedChildren`, `moveItem`); sırası olmayanlar alfabetik sona. Liste satırlarında tek dokunuş = aç, çift dokunuş = menü (`addTaps`), basılı tut = menü (`addLongPress`). Çoklu seçim: `S.sel`, `filesCopyMove`, `filesDelete`, `renameSong` (iPhone'da da açık — dosya yönetimi).
 
 Şarkı notları: `notlar.json` → `{ notes: { <yol>: { solist, bpm, ton, style, not, updated, deleted? } } }` — yol başına `updated` ile birleştirilir. Şarkı yeniden adlandırılınca/taşınınca not da taşınır (`replacePathEverywhere`). Toplu taşımada (repertuvar düzenleme) `notlar.json` ve `programlar.json` yolları da güncellenmeli.

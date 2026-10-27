@@ -1,5 +1,11 @@
 # Yol haritası
 
+## v5.7.0 — tamam (önizlemeyle onaylandı)
+- Klasör ağacı: klasöre tek dokunuş içini hemen altında açar/kapatır (▸/▾, girinti); çift dokunuş → menü (Aç = klasör sayfası). Açık klasörler hatırlanır (`md.openDirs`); ⌂ hepsini kapatır.
+- ⌂ geniş ekranlarda da (Mac, iPad, Windows).
+- Sözlerdeki görünmez kontrol karakterleri (DOS Ctrl‑Z 0x1A, 559 dosyada) ekranda gizlenir; dosyaya dokunulmaz.
+- Testler: klasöre girmek için `window.__mdGo(yol)`.
+
 ## v5.6.0 — tamam (önizlemeyle onaylandı)
 - Programlar'da ↕ Sırala: programların sırası (`programlar.json` → `order`, `orderUpdated`) ve program içi şarkı sırası büyük ▲▼✕ ile; normal görünümde küçük oklar kalktı.
 - 5.5.1: 🔗 düğmesi eski önbellekli index.html'de de eklenir.
