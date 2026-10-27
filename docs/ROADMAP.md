@@ -1,5 +1,8 @@
 # Yol haritası
 
+## v5.5.0 — tamam (önizlemeyle onaylandı)
+- 🔗 Ortak Sahne: iki cihaz aynı oda koduyla bağlanır; biri şarkı açınca öteki de açar (karşılıklı / takip et / ben yönetirim). Aracı ntfy.sh (SSE + POST), sadece şarkı yolu gider. Oda kodu data deposunda `sahne.json`. Kapalıyken hiçbir şey yapmaz; internet koparsa sadece takip durur. Gerçek ntfy ile saha testi bekliyor.
+
 ## v5.4.0 — tamam (önizlemeyle onaylandı)
 - İnternette ara sayfası: Google ayrı pencerede ("şarkı sözleri" eklenir); cihaza göre reklamsız + gece modu okuma ipuçları (iPhone/iPad Safari Okuyucu, Android Chrome Okuma modu, Windows Edge F9, Mac Safari). Uygulama içerik çekmez (yasal: kopyala‑yapıştır). Brave/Google arama API'leri değerlendirildi: Google JSON API yeni kullanıcı almıyor (1.1.2027 kapanıyor), Brave anahtarı istemcide olmamalı → ara sunucu gerekir; şimdilik yok.
 - Android telefonlar iPhone gibi: görüntüleme + not + dosya yönetimi.
