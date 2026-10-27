@@ -482,3 +482,18 @@ mark.fix { background: rgba(212,177,58,.25); color: var(--gold2); border-bottom:
 .fix-frow input { width: 22px; height: 22px; margin-top: 2px; accent-color: var(--gold); flex: none; }
 .fix-frow small { display: block; opacity: .7; } .fix-frow small.nm { display: inline; color: var(--gold2); opacity: 1; }
 .btn.fix-btn { border-color: var(--gold); color: var(--gold2); }
+
+/* 📄 PDF / Word içe aktar */
+.doc-list { max-height: 58dvh; overflow: auto; }
+.doc-file { border: 1px solid var(--gold-dim); border-radius: 14px; padding: 10px 12px; margin: 10px 0; background: var(--soft); }
+.doc-fname { font-weight: 800; color: var(--gold2); font-size: calc(15px * var(--ui)); }
+.doc-folder { font-size: calc(18px * var(--ui)); font-weight: 700; }
+.doc-songs { margin-top: 8px; }
+.doc-song { border-top: 1px solid var(--divider); padding: 8px 2px; }
+.doc-row { display: flex; align-items: center; gap: 8px; }
+.doc-row input[type=checkbox] { width: 24px; height: 24px; accent-color: var(--gold); flex: none; }
+.doc-title { flex: 1; min-width: 0; background: transparent; border: 1px solid transparent; border-radius: 8px; color: var(--text); font-size: calc(16px * var(--ui)); font-weight: 700; padding: 6px; }
+.doc-title:focus { border-color: var(--gold); outline: none; }
+.doc-badge { flex: none; font-size: 12px; font-weight: 800; color: #111; background: #e0a030; border-radius: 8px; padding: 3px 8px; }
+.doc-first { opacity: .65; font-size: calc(13px * var(--ui)); padding-left: 32px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.doc-prev { white-space: pre-wrap; font-size: calc(15px * var(--ui)); margin: 6px 0 0 32px; padding: 8px; border-radius: 8px; background: var(--bg); }

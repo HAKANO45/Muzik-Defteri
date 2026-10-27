@@ -7,7 +7,7 @@ import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, e
 import { t, getLang, setLang } from './i18n.js';
 import { suggest, fixAll, fixName, mostlyUpper, toSentence, tidyBlank } from './turkce.js';
 
-export const VERSION = '5.9.0';
+export const VERSION = '5.10.0';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -525,6 +525,7 @@ function renderList() {
       h('button', { class: 'small-btn', title: t('selectTitle'), onclick: () => { S.sel = new Set(); renderList(); } }, '☑'),
       h('button', { class: 'small-btn', title: t('newFolder'), onclick: () => newFolder() }, '＋📁'),
       VIEW_ONLY ? null : h('button', { class: 'small-btn', title: t('newSong'), onclick: () => openEditor(null) }, '＋♪'),
+      VIEW_ONLY ? null : h('button', { class: 'small-btn', title: t('importDoc'), onclick: () => pickDocuments() }, '📄'),
       VIEW_ONLY || !S.dir ? null : h('button', { class: 'small-btn', title: t('renameFolder'), onclick: () => renameFolder(S.dir) }, '✎📁'),
       VIEW_ONLY || !S.dir ? null : h('button', { class: 'small-btn danger-btn', title: t('deleteFolder'), onclick: () => deleteFolder(S.dir) }, '🗑📁')].filter(Boolean));
     const { dirs, files } = orderedChildren(S.dir);
@@ -1799,6 +1800,96 @@ async function importFiles(fileList, useRelative) {
   await importEntries(entries);
 }
 
+// ------------------------------------------------------------------ 📄 PDF / Word içe aktar
+function pickDocuments() {
+  if (VIEW_ONLY) { toast(t('viewOnly')); return; }
+  const inp = h('input', { type: 'file', accept: '.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document', multiple: true });
+  inp.onchange = () => { if (inp.files.length) importDocuments([...inp.files]); };
+  inp.click();
+}
+async function importDocuments(files) {
+  const bad = files.filter(f => /\.doc$/i.test(f.name));
+  if (bad.length) toast(t('docOld'));
+  files = files.filter(f => /\.(pdf|docx)$/i.test(f.name));
+  if (!files.length) return;
+  toast(t('docReading', { n: files.length }));
+  const { parseDocument } = await import('./belge.js');
+  const docs = [];
+  for (const f of files) {
+    try {
+      const r = await parseDocument(f);
+      docs.push({ name: f.name, folder: r.folder, songs: r.songs.map(x => ({ ...x, on: true })) });
+    } catch (e) { console.error(e); toast(f.name + ': ' + t('docFail')); }
+  }
+  if (!docs.length) return;
+  const exists = title => (S.titleIndex.get(fold(title).replace(/[^a-z0-9]+/g, '')) || []).filter(p => S.songs.has(p) && !S.songs.get(p).del);
+  const body = h('div', { class: 'doc-list' });
+  const count = h('b', {});
+  const recount = () => { const n = docs.reduce((a, d) => a + d.songs.filter(x => x.on).length, 0); count.textContent = t('docSelected', { n }); };
+  for (const d of docs) {
+    const fIn = h('input', { class: 'field doc-folder', value: d.folder, oninput: () => { d.folder = fIn.value; } });
+    const list = h('div', { class: 'doc-songs' }, ...d.songs.map(x => {
+      const ex = exists(x.title);
+      const cb = h('input', { type: 'checkbox', checked: true, onchange: () => { x.on = cb.checked; recount(); } });
+      const tIn = h('input', { class: 'doc-title', value: x.title, oninput: () => { x.title = tIn.value; } });
+      const prev = h('pre', { class: 'doc-prev', hidden: true }, x.text);
+      return h('div', { class: 'doc-song' + (ex.length ? ' exists' : '') },
+        h('div', { class: 'doc-row' }, cb, tIn,
+          ex.length ? h('span', { class: 'doc-badge', title: ex.join('\n') }, t('docExists', { n: ex.length })) : null,
+          h('button', { class: 'small-btn', onclick: () => { prev.hidden = !prev.hidden; } }, '👁')),
+        h('div', { class: 'doc-first' }, x.text.split('\n').filter(l => l.trim()).slice(0, 2).join(' / ')),
+        prev);
+    }));
+    body.append(h('div', { class: 'doc-file' },
+      h('div', { class: 'doc-fname' }, '📄 ' + d.name + ' · ' + t('songs', { n: d.songs.length })),
+      h('label', { class: 'lab' }, '📁 ' + t('folder')), fIn, list));
+  }
+  recount();
+  const save = async () => {
+    const changes = [], add = [], orders = new Map();
+    const used = new Set();
+    for (const d of docs) {
+      const dir = d.folder.split('/').map(x => x.replace(/[\\:*?"<>|]/g, '').trim()).filter(Boolean).join('/');
+      for (const x of d.songs.filter(x => x.on)) {
+        const name = x.title.replace(/[\\/:*?"<>|]/g, '').trim(); if (!name) continue;
+        let p = (dir ? dir + '/' : '') + name + '.txt', i = 2;
+        while ((S.songs.has(p) && !S.songs.get(p).del) || used.has(p)) p = (dir ? dir + '/' : '') + `${name} (${i++}).txt`;
+        used.add(p);
+        if (!orders.has(dir)) orders.set(dir, []); orders.get(dir).push(baseName(p));
+        const text = x.text.replace(/\r\n?/g, '\n') + '\n';
+        const { bytes, enc } = songToBytes({ t: text, e: 'utf8', n: 1 });
+        changes.push({ path: 'repertuar/' + p, bytes });
+        add.push({ p, text, enc, bytes });
+      }
+    }
+    if (!add.length) return;
+    if (!(await commitFolderChange([], changes, `PDF/Word içe aktarıldı: ${add.length} şarkı (${docs.map(d => d.name).join(', ').slice(0, 120)})`))) return;
+    const ok = gh().ok, puts = [];
+    for (const a of add) {
+      const sha = await gitBlobSha(a.bytes);
+      const rec = decorate({ p: a.p, t: a.text, e: a.enc, n: 1, s: ok ? sha : undefined, dirty: !ok, m: Date.now(), ...(ok ? { up: sha, upAt: Date.now() } : {}) });
+      S.songs.set(a.p, rec); puts.push(strip(rec));
+    }
+    await db.putSongs(puts);
+    // PDF'deki sıra korunur: klasörün kendi sırası (siralama.json) PDF sırasıyla yazılır
+    for (const [dir, names] of orders) {
+      const prev = ((S.order.order[dir] || {}).names || []).filter(n => !names.includes(n));
+      S.order.order[dir] = { names: [...prev, ...names], updated: Date.now() };
+    }
+    saveOrder();
+    closeModal(); rebuildIndex();
+    const first = dirName(add[0].p);
+    goDir(first); scheduleSync(800);
+    toast(t('docSaved', { n: add.length }));
+  };
+  modal(
+    h('div', { class: 'modal-head' }, h('h2', {}, '📄 ' + t('importDoc')), h('button', { class: 'mh-btn', onclick: closeModal }, '✕')),
+    h('p', { class: 'hint' }, t('docHelp')),
+    body,
+    h('div', { class: 'btn-row' }, h('button', { class: 'btn primary fix-apply', onclick: save }, '✓ ', count), h('button', { class: 'btn', onclick: closeModal }, t('cancel'))),
+  );
+}
+
 async function importZip(file) {
   toast(t('unpacking'));
   try {
@@ -1902,6 +1993,7 @@ async function openSettings() {
     h('div', { class: 'btn-row' },
       VIEW_ONLY ? null : h('button', { class: 'btn', onclick: () => { closeModal(); $('fileZip').click(); } }, t('importZip')),
       VIEW_ONLY ? null : h('button', { class: 'btn', onclick: () => { closeModal(); $('fileTxt').click(); } }, t('importTxt')),
+      VIEW_ONLY ? null : h('button', { class: 'btn primary', onclick: () => { closeModal(); pickDocuments(); } }, '📄 ' + t('importDoc')),
       VIEW_ONLY || isIos ? null : h('button', { class: 'btn', onclick: () => { closeModal(); $('fileDir').click(); } }, t('importFolder')),
       h('button', { class: 'btn', onclick: () => { closeModal(); exportZip(); } }, t('exportZip'))),
     h('h3', {}, t('install')),
@@ -2115,7 +2207,9 @@ function bind() {
     e.preventDefault();
     const files = [...(e.dataTransfer.files || [])];
     const zip = files.find(f => /\.zip$/i.test(f.name));
-    if (zip) importZip(zip); else if (files.length) importFiles(files, false);
+    const docs = files.filter(f => /\.(pdf|docx)$/i.test(f.name));
+    if (docs.length && !VIEW_ONLY) importDocuments(docs);
+    else if (zip) importZip(zip); else if (files.length) importFiles(files, false);
   });
 
   // sahne
