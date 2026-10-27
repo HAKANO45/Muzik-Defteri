@@ -6,7 +6,7 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '5.2.0';
+export const VERSION = '5.3.0';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -31,7 +31,9 @@ const S = {
   current: null, context: { list: [], label: '' },
   programs: { format: 1, programs: [], fav: [], favUpdated: 0 },
   notes: { format: 1, notes: {} },
-  removed: {},                       // klasör işlemiyle kaldırılan yollar -> zaman (eski paket koruması)   // şarkı notları: yol -> { solist, ton, not, updated } (notlar.json ile senkron)
+  removed: {},
+  order: { format: 1, order: {} },   // kullanıcı sıralaması: klasör -> { names:[…], updated } (siralama.json)
+  sel: null, sortMode: false,                       // klasör işlemiyle kaldırılan yollar -> zaman (eski paket koruması)   // şarkı notları: yol -> { solist, ton, not, updated } (notlar.json ile senkron)
   recent: [],
   settings: { gh: { owner: 'HAKANO45', repo: '-Muzik-Defteri-Repertuar', branch: 'main', token: '' }, font: 22, stageFont: 34, speed: 30, searchText: true, clock24: true },
   transpose: 0, scrolling: false,
@@ -239,18 +241,180 @@ function mergeNotes(local, remote) {
   return { format: 1, notes: out };
 }
 
-function songItem(p, { sub, html, acts, ctx } = {}) {
+function songItem(p, { sub, html, acts, ctx, tapMenu } = {}) {
   const rec = S.songs.get(p);
   const missing = !rec || rec.del;
   const title = missing ? baseName(p).replace(/\.txt$/i, '') + ' ' + t('missingSong') : rec._title;
   const tags = missing ? [] : rec._tags.map(x => h('span', { class: 'tag' }, x));
   const subEl = html ? h('span', { class: 'sub', html }) : h('span', { class: 'sub' }, sub != null ? sub : dirName(p) || t('root'));
-  return h('div', { class: 'item' + (p === S.current ? ' active' : ''), role: 'button', tabindex: 0, 'data-p': p,
-      onclick: e => { if (e.target.closest('.acts')) return; if (!missing) openSong(p, ctx); },
+  const el = h('div', { class: 'item' + (p === S.current ? ' active' : ''), role: 'button', tabindex: 0, 'data-p': p,
+      onclick: tapMenu ? null : e => { if (e.target.closest('.acts')) return; if (!missing) openSong(p, ctx); },
       onkeydown: e => { if (e.key === 'Enter' && !missing) openSong(p, ctx); } },
     h('span', { class: 'ico' }, rec && rec.dirty ? '✱' : '♪'),
     h('span', { class: 'main' }, h('span', { class: 'name' }, title, ...tags, ...noteChips(missing ? null : noteOf(p), true)), subEl),
     acts ? h('span', { class: 'acts' }, ...acts) : null);
+  if (tapMenu && !missing) { addTaps(el, () => openSong(p, ctx), () => openSongSheetList(p, ctx)); addLongPress(el, () => openSongSheetList(p, ctx)); }
+  return el;
+}
+
+// ------------------------------------------------------------------ sıralama · çoklu seçim · çift dokunuş
+/** Kullanıcının belirlediği sıra (siralama.json, tüm cihazlara senkron). Sırası olmayanlar alfabetik, sona. */
+function orderedChildren(dir) {
+  const node = S.dirs.get(dir) || { dirs: new Set(), files: [] };
+  const ord = (S.order.order[dir] || {}).names || [];
+  const pos = new Map(ord.map((n, i) => [n, i]));
+  const cmp = (a, b) => {
+    const pa = pos.has(baseName(a)) ? pos.get(baseName(a)) : 1e9, pb = pos.has(baseName(b)) ? pos.get(baseName(b)) : 1e9;
+    return pa - pb || S.collator.compare(baseName(a), baseName(b));
+  };
+  return { dirs: [...node.dirs].sort(cmp), files: [...node.files].sort(cmp) };
+}
+function moveItem(dir, all, p, d) {
+  const i = all.indexOf(p), j = i + d;
+  if (i < 0 || j < 0 || j >= all.length) return;
+  const isDir = q => S.dirs.has(q) && !S.songs.has(q);
+  if (isDir(all[i]) !== isDir(all[j])) return;          // klasörler üstte, şarkılar altta kalır
+  [all[i], all[j]] = [all[j], all[i]];
+  S.order.order[dir] = { names: all.map(baseName), updated: Date.now() };
+  saveOrder(); renderList();
+}
+function saveOrder() { S.order.dirty = true; db.set('order', S.order); scheduleSync(); }
+function resetOrder(dir) { S.order.order[dir] = { names: [], updated: Date.now() }; saveOrder(); renderList(); }
+
+/** Tek dokunuş = aç, çift dokunuş = menü */
+function addTaps(el, single, double) {
+  let timer = 0;
+  el.addEventListener('click', e => {
+    if (e.target.closest('.acts')) return;
+    if (timer) { clearTimeout(timer); timer = 0; double(); return; }
+    timer = setTimeout(() => { timer = 0; single(); }, 260);
+  });
+}
+
+function selectItem(p) {
+  const rec = S.songs.get(p); const on = S.sel.has(p);
+  return h('div', { class: 'item sel-item' + (on ? ' selected' : ''), role: 'button', tabindex: 0,
+      onclick: () => { on ? S.sel.delete(p) : S.sel.add(p); renderList(); } },
+    h('span', { class: 'sel-box' }, on ? '✓' : ''),
+    h('span', { class: 'main' }, h('span', { class: 'name' }, rec ? rec._title : baseName(p))));
+}
+
+function renderEditBar(head) {
+  const bar = h('div', { class: 'edit-bar' });
+  if (S.sortMode) {
+    bar.append(h('span', { class: 'edit-title' }, '↕ ' + t('sortHint')),
+      h('button', { class: 'small-btn', onclick: () => resetOrder(S.dir) }, t('sortAZ')),
+      h('button', { class: 'nav-pill', onclick: () => { S.sortMode = false; renderList(); } }, '✓ ' + t('done')));
+  } else {
+    const { files } = orderedChildren(S.dir);
+    const n = S.sel.size;
+    bar.append(h('span', { class: 'edit-title' }, t('selectedN', { n })),
+      h('button', { class: 'small-btn', onclick: () => { if (S.sel.size === files.length) S.sel.clear(); else files.forEach(f => S.sel.add(f)); renderList(); } }, t('selectAll')),
+      h('button', { class: 'nav-pill', onclick: () => { S.sel = null; renderList(); } }, '✕'));
+    const acts = h('div', { class: 'sel-acts' },
+      h('button', { class: 'sel-act', disabled: !n, onclick: () => filesCopyMove([...S.sel], 'copy') }, '⧉ ' + t('copy')),
+      h('button', { class: 'sel-act', disabled: !n, onclick: () => filesCopyMove([...S.sel], 'move') }, '➜ ' + t('move')),
+      h('button', { class: 'sel-act', disabled: n !== 1, onclick: () => renameSong([...S.sel][0]) }, '✎ ' + t('rename')),
+      h('button', { class: 'sel-act danger', disabled: !n, onclick: () => filesDelete([...S.sel]) }, '🗑 ' + t('delete')));
+    head.append(bar, acts); return;
+  }
+  head.append(bar);
+}
+
+/** Şarkı menüsü (çift dokunuş / basılı tut): aç, seç, yeniden adlandır, kopyala, taşı, sil */
+function openSongSheetList(p, ctx) {
+  const rec = S.songs.get(p); if (!rec) return;
+  const act = (icon, label, fn, cls = '') => h('button', { class: 'sheet-act ' + cls, onclick: () => { closeModal(); fn(); } },
+    h('span', { class: 'sheet-ico' }, icon), h('span', {}, label));
+  modal(h('div', { class: 'sheet-grab' }),
+    h('div', { class: 'sheet-title' }, '♪ ' + rec._title),
+    h('div', { class: 'sheet-grid folder-acts' },
+      act('📂', t('open'), () => openSong(p, ctx)),
+      act('☑', t('selectTitle'), () => { S.sel = new Set([p]); renderList(); }),
+      act('✎', t('rename'), () => renameSong(p)),
+      act('⧉', t('copy'), () => filesCopyMove([p], 'copy')),
+      act('➜', t('move'), () => filesCopyMove([p], 'move')),
+      act('🗑', t('delete'), () => filesDelete([p]), 'danger')),
+    h('button', { class: 'btn sheet-close', onclick: closeModal }, t('close')));
+  $('modal').classList.add('sheet');
+}
+
+function uniquePath(dir, name) {
+  const stem = name.replace(/\.txt$/i, '');
+  let p = (dir ? dir + '/' : '') + stem + '.txt', i = 2;
+  while (S.songs.has(p) && !S.songs.get(p).del) p = (dir ? dir + '/' : '') + `${stem} (${i++}).txt`;
+  return p;
+}
+
+/** Çoklu kopyala / taşı: hedef klasörü listeden seç; tek commit, içerik yeniden yüklenmez */
+async function filesCopyMove(paths, kind) {
+  paths = paths.filter(p => S.songs.has(p));
+  if (!paths.length) return;
+  const target = await pickFolder(t(kind === 'copy' ? 'copyFilesTo' : 'moveFilesTo', { n: paths.length }), null);
+  if (target === null) return;
+  const pairs = [];
+  for (const p of paths) {
+    if (kind === 'move' && dirName(p) === target) continue;
+    const np = uniquePath(target, baseName(p));
+    pairs.push([p, np]);
+    S.songs.set(np, { p: np, _reserved: true });     // aynı ad iki kez seçilmesin (geçici)
+  }
+  for (const [, np] of pairs) S.songs.delete(np);
+  if (!pairs.length) return;
+  const songs = pairs.map(([a]) => S.songs.get(a));
+  const changes = [];
+  for (const [a, b] of pairs) {
+    changes.push({ path: 'repertuar/' + b, sha: S.songs.get(a).s, fromP: a });
+    if (kind === 'move') changes.push({ path: 'repertuar/' + a, delete: true });
+  }
+  const msg = `${kind === 'copy' ? 'Kopyalandı' : 'Taşındı'}: ${pairs.length} şarkı → ${target || 'Repertuvar'}`;
+  if (!(await commitFolderChange(songs, changes, msg))) return;
+  const puts = [], dels = [];
+  for (const [a, b] of pairs) {
+    const r = S.songs.get(a);
+    const nr = decorate({ p: b, t: r.t, e: r.e, n: r.n, s: r.s, dirty: gh().ok ? false : true, m: Date.now(),
+      ...(gh().ok && r.s ? { up: r.s, upAt: Date.now() } : {}) });
+    S.songs.set(b, nr); puts.push(strip(nr));
+    if (kind === 'move') { S.songs.delete(a); dels.push(a); }
+  }
+  if (dels.length) { await db.deleteSongs(dels); markRemoved(dels); remapPaths(new Map(pairs)); }
+  await db.putSongs(puts);
+  S.sel = null; rebuildIndex(); goDir(target); scheduleSync(800);
+  toast(t(kind === 'copy' ? 'filesCopied' : 'filesMoved', { n: pairs.length }));
+}
+
+async function filesDelete(paths) {
+  paths = paths.filter(p => S.songs.has(p));
+  if (!paths.length) return;
+  if (!(await confirmBox(t('confirmDeleteFiles', { n: paths.length })))) return;
+  const withSha = paths.map(p => S.songs.get(p)).filter(r => r.s);
+  if (withSha.length && !(await commitFolderChange(withSha, withSha.map(r => ({ path: 'repertuar/' + r.p, delete: true })), `Silindi: ${paths.length} şarkı`))) return;
+  for (const p of paths) S.songs.delete(p);
+  await db.deleteSongs(paths); markRemoved(paths);
+  remapPaths(new Map(paths.map(p => [p, null])));
+  if (S.current && !S.songs.has(S.current)) { S.current = null; $('song').hidden = true; renderEmpty(); }
+  S.sel = null; rebuildIndex(); renderList(); scheduleSync(800);
+  toast(t('filesDeleted', { n: paths.length }));
+}
+
+async function renameSong(p) {
+  const rec = S.songs.get(p); if (!rec) return;
+  const name = await promptText(t('rename'), baseName(p).replace(/\.txt$/i, ''));
+  if (!name) return;
+  const clean = name.replace(/[\\/:*?"<>|]/g, '').trim(); if (!clean) return;
+  const np = (dirName(p) ? dirName(p) + '/' : '') + clean + '.txt';
+  if (np === p) return;
+  if (S.songs.has(np) && !S.songs.get(np).del) { toast(t('nameExists')); return; }
+  if (!(await commitFolderChange([rec], [{ path: 'repertuar/' + np, sha: rec.s, fromP: p }, { path: 'repertuar/' + p, delete: true }], `Yeniden adlandırıldı: ${p} → ${np}`))) return;
+  const nr = decorate({ p: np, t: rec.t, e: rec.e, n: rec.n, s: rec.s, dirty: gh().ok ? false : rec.dirty, m: Date.now(), ...(gh().ok && rec.s ? { up: rec.s, upAt: Date.now() } : {}) });
+  S.songs.set(np, nr); S.songs.delete(p);
+  await db.deleteSongs([p]); await db.putSongs([strip(nr)]); markRemoved([p]);
+  // kendi sırasında yerini koru
+  const o = S.order.order[dirName(p)]; if (o && o.names) { const i = o.names.indexOf(baseName(p)); if (i >= 0) { o.names[i] = baseName(np); o.updated = Date.now(); saveOrder(); } }
+  remapPaths(new Map([[p, np]]));
+  S.sel = null; rebuildIndex(); renderList(); scheduleSync(800);
+  if (S.current === np && $('editor').hidden) renderSong();
+  toast(t('saved'));
 }
 
 function renderList() {
@@ -286,27 +450,36 @@ function renderList() {
       const d = parts.slice(0, i + 1).join('/');
       head.append(h('button', { class: 'crumb', onclick: () => goDir(d) }, part));
     });
-    head.append(...[h('span', { class: 'spacer' }),
+    if (S.sel || S.sortMode) { renderEditBar(head); }
+    else head.append(...[h('span', { class: 'spacer' }),
+      h('button', { class: 'small-btn', title: t('sortTitle'), onclick: () => { S.sortMode = true; renderList(); } }, '↕'),
+      h('button', { class: 'small-btn', title: t('selectTitle'), onclick: () => { S.sel = new Set(); renderList(); } }, '☑'),
       h('button', { class: 'small-btn', title: t('newFolder'), onclick: () => newFolder() }, '＋📁'),
       VIEW_ONLY ? null : h('button', { class: 'small-btn', title: t('newSong'), onclick: () => openEditor(null) }, '＋♪'),
       VIEW_ONLY || !S.dir ? null : h('button', { class: 'small-btn', title: t('renameFolder'), onclick: () => renameFolder(S.dir) }, '✎📁'),
       VIEW_ONLY || !S.dir ? null : h('button', { class: 'small-btn danger-btn', title: t('deleteFolder'), onclick: () => deleteFolder(S.dir) }, '🗑📁')].filter(Boolean));
-    const node = S.dirs.get(S.dir) || { dirs: new Set(), files: [] };
-    const dirs = [...node.dirs].sort((a, b) => S.collator.compare(baseName(a), baseName(b)));
+    const { dirs, files } = orderedChildren(S.dir);
+    const all = [...dirs, ...files];
+    const moveBtns = (p) => S.sortMode ? h('span', { class: 'acts sort-acts' },
+      h('button', { class: 'sort-btn', onclick: e => { e.stopPropagation(); moveItem(S.dir, all, p, -1); } }, '▲'),
+      h('button', { class: 'sort-btn', onclick: e => { e.stopPropagation(); moveItem(S.dir, all, p, 1); } }, '▼')) : null;
     for (const d of dirs) {
-      const row = h('div', { class: 'item', role: 'button', tabindex: 0,
-          onclick: e => { if (e.target.closest('.more-btn')) return; goDir(d); },
+      const row = h('div', { class: 'item' + (S.sortMode ? ' sorting' : ''), role: 'button', tabindex: 0,
           onkeydown: e => { if (e.key === 'Enter') goDir(d); } },
         h('span', { class: 'ico' }, '📁'),
         h('span', { class: 'main' }, h('span', { class: 'name' }, baseName(d))),
-        h('span', { class: 'count' }, countIn(d)));
-      addLongPress(row, () => openFolderSheet(d));
+        S.sortMode ? moveBtns(d) : h('span', { class: 'count' }, countIn(d)));
+      if (!S.sortMode && !S.sel) { addTaps(row, () => goDir(d), () => openFolderSheet(d)); addLongPress(row, () => openFolderSheet(d)); }
       list.append(row);
     }
-    const ctx = { list: node.files, label: S.dir || t('root') };
-    for (const p of node.files.slice(0, S.limit)) list.append(songItem(p, { ctx, sub: '' }));
-    if (node.files.length > S.limit) list.append(h('button', { class: 'small-btn', style: 'margin:10px', onclick: () => { S.limit += 300; renderList(); } }, t('showMore', { n: node.files.length - S.limit })));
-    if (!dirs.length && !node.files.length) {
+    const ctx = { list: files, label: S.dir || t('root') };
+    for (const p of files.slice(0, S.limit)) {
+      if (S.sel) list.append(selectItem(p));
+      else if (S.sortMode) { const it = songItem(p, { ctx, sub: '', acts: moveBtns(p).childNodes }); it.classList.add('sorting'); it.onclick = null; list.append(it); }
+      else { const it = songItem(p, { ctx, sub: '', tapMenu: true }); list.append(it); }
+    }
+    if (files.length > S.limit) list.append(h('button', { class: 'small-btn', style: 'margin:10px', onclick: () => { S.limit += 300; renderList(); } }, t('showMore', { n: files.length - S.limit })));
+    if (!dirs.length && !files.length) {
       list.append(h('div', { class: 'list-note' }, S.songs.size ? (VIEW_ONLY ? '—' : t('emptyFolder')) : t('welcomeText')));
       if (S.dir && S.virtualDirs.has(S.dir)) list.append(h('button', { class: 'small-btn', style: 'margin:0 12px', onclick: () => deleteEmptyFolder(S.dir) }, '🗑 ' + t('deleteFolder')));
     }
@@ -334,10 +507,11 @@ function renderList() {
   if (!prog) {
     head.append(h('span', { class: 'spacer' }), h('button', { class: 'small-btn', onclick: newProgram }, '＋ ' + t('newProgram')));
     for (const p of progs) {
-      const row = h('div', { class: 'item', role: 'button', tabindex: 0, onclick: () => { S.programId = p.id; saveUi(); renderList(); } },
+      const row = h('div', { class: 'item', role: 'button', tabindex: 0 },
         h('span', { class: 'ico' }, '☰'),
         h('span', { class: 'main' }, h('span', { class: 'name' }, p.name)),
         h('span', { class: 'count' }, p.items.length));
+      addTaps(row, () => { S.programId = p.id; saveUi(); renderList(); }, () => openProgramSheet(p));   // çift dokunuş → menü
       addLongPress(row, () => openProgramSheet(p));   // basılı tut → program menüsü
       list.append(row);
     }
@@ -370,7 +544,7 @@ function goHome() {
   goDir('');
 }
 
-function goDir(d) { S.dir = d; S.tab = 'library'; S.limit = 300; $('q').value = ''; saveUi(); renderList(); $('list').scrollTop = 0; }
+function goDir(d) { if (d !== S.dir) { S.sel = null; S.sortMode = false; } S.dir = d; S.tab = 'library'; S.limit = 300; $('q').value = ''; saveUi(); renderList(); $('list').scrollTop = 0; }
 
 /** Kullanıcının bulunduğu yer (sekme/klasör/program) — iPhone uygulamayı kapatıp açınca aynı yerden devam. */
 function saveUi() {
@@ -1177,6 +1351,16 @@ async function sync({ quiet = false } = {}) {
       S.notes.dirty = false;
       await db.set('notes', S.notes);
     }
+    // 4b) Sıralama (klasör başına, son değişen kazanır)
+    {
+      const { data: od, sha: osha } = await g.getJson('siralama.json');
+      const remote = (od && od.order) || {}, out = { ...remote };
+      for (const [d, v] of Object.entries(S.order.order || {})) if (!out[d] || (v.updated || 0) > (out[d].updated || 0)) out[d] = v;
+      const changedO = JSON.stringify(out) !== JSON.stringify(remote);
+      S.order = { format: 1, order: out };
+      if (changedO) await g.putFile('siralama.json', new TextEncoder().encode(JSON.stringify(S.order, null, 1)), 'Sıralama güncellendi', osha || undefined);
+      await db.set('order', S.order);
+    }
     // 5) Görünüm (tema, düğme boyutu…) — tüm cihazlarda aynı
     {
       const { data: gd, sha: gsha } = await g.getJson('gorunum.json');
@@ -1669,6 +1853,7 @@ async function start() {
   ]);
   if (notes && notes.notes) S.notes = notes;
   try { S.removed = (await db.get('removed')) || {}; } catch (_) {}
+  try { const o = await db.get('order'); if (o && o.order) S.order = o; } catch (_) {}
   if (Array.isArray(vdirs)) S.virtualDirs = new Set(vdirs);
   if (settings) S.settings = { ...S.settings, ...settings, gh: { ...S.settings.gh, ...(settings.gh || {}) } };
   if (programs) S.programs = { ...S.programs, ...programs };

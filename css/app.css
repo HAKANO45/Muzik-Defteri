@@ -389,4 +389,17 @@ input, textarea, select { font: inherit; color: var(--text); }
 .view-only .sheet-grid { grid-template-columns: repeat(2, 1fr); }
 .sheet-grid.folder-acts { grid-template-columns: repeat(3, 1fr); }
 .folder-pick { max-height: 55dvh; overflow-y: auto; margin-top: 8px; }
+/* sıralama + çoklu seçim */
+.edit-bar { display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 0; }
+.edit-bar .edit-title { flex: 1; color: var(--gold2); font-weight: 800; font-size: 17px; }
+.sel-acts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; width: 100%; margin: 4px 0 6px; }
+.sel-act { height: calc(48px * var(--ui)); border-radius: 12px; border: 2px solid var(--gold-dim); background: var(--soft); color: var(--gold2); font-weight: 700; font-size: calc(14px * var(--ui)); }
+.sel-act.danger { border-color: var(--danger); color: var(--danger); }
+.sel-act:disabled { opacity: .35; }
+.sel-item .sel-box { width: calc(30px * var(--ui)); height: calc(30px * var(--ui)); flex: none; border-radius: 8px; border: 2px solid var(--gold-dim); display: inline-flex; align-items: center; justify-content: center; font-weight: 900; color: var(--on-gold); }
+.sel-item.selected { background: var(--active); }
+.sel-item.selected .sel-box { background: var(--gold); border-color: var(--gold); }
+.sort-acts { gap: 6px !important; }
+.sort-btn, .item .acts .sort-btn { width: calc(48px * var(--ui)) !important; height: calc(44px * var(--ui)) !important; border-radius: 10px; border: 2px solid var(--gold) !important; background: var(--soft) !important; color: var(--gold2) !important; font-size: calc(18px * var(--ui)); font-weight: 900; }
+.item.sorting { border: 1px dashed var(--gold-dim); margin-bottom: 4px; }
 .item .more-btn { flex: none; width: 44px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--gold); font-size: 22px; font-weight: 700; line-height: 1; }
