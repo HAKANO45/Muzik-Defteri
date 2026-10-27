@@ -21,7 +21,7 @@ async function setup(browser, opts) {
   await page.goto('http://localhost:8765/');
   await page.evaluate(() => { localStorage.clear(); localStorage.setItem('md.lang', 'tr'); localStorage.setItem('md.settings.backup.v1', JSON.stringify({ gh: { owner: 'HAKANO45', repo: '-Muzik-Defteri-Repertuar', branch: 'main', token: 'x' }, font: 22, stageFont: 34, speed: 30, _savedAt: Date.now() })); });
   await page.reload();
-  await page.waitForFunction(() => window.__md.songs.size > 15000 && !window.__md.sync.busy, null, { timeout: 60000 });
+  await page.waitForFunction(() => window.__md.songs.size > 5000 && !window.__md.sync.busy, null, { timeout: 60000 });
   await page.waitForTimeout(2800);
   return { page, errors };
 }

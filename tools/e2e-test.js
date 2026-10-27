@@ -66,13 +66,12 @@ const shot = process.argv[2] || 'desk';
   });
   await page.reload();
   const t0 = Date.now();
-  await page.waitForFunction(() => window.__md && window.__md.songs.size > 15000, null, { timeout: 60000 });
+  await page.waitForFunction(() => window.__md && window.__md.songs.size > 5000, null, { timeout: 60000 });
   await page.waitForFunction(() => !window.__md.sync.busy, null, { timeout: 60000 });
   console.log('loaded songs in', Date.now() - t0, 'ms');
   await page.screenshot({ path: (process.env.OUT || '/tmp') + '/' + shot + '-1-library.png' });
   // Klasöre gir
-  await page.locator('.item', { hasText: 'Türküler' }).first().click();
-  await page.locator('.item', { hasText: '01.Ussak' }).first().click();
+  await page.locator('.item', { hasText: 'Türk Halk Müziği' }).first().click();
   await page.screenshot({ path: (process.env.OUT || '/tmp') + '/' + shot + '-2-folder.png' });
   await page.locator('.item', { hasText: 'Haydar Haydar' }).first().click();
   await page.waitForTimeout(200);

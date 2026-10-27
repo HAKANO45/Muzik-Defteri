@@ -27,12 +27,12 @@ const trees = [], commits = [], patches = [], puts = [];
   await page.goto('http://localhost:8765/');
   await page.evaluate(() => { localStorage.clear(); localStorage.setItem('md.lang', 'tr'); localStorage.setItem('md.settings.backup.v1', JSON.stringify({ gh: { owner: 'HAKANO45', repo: '-Muzik-Defteri-Repertuar', branch: 'main', token: 'x' }, font: 22, stageFont: 34, speed: 30, _savedAt: Date.now() })); });
   await page.reload();
-  await page.waitForFunction(() => window.__md.songs.size > 15000 && !window.__md.sync.busy, null, { timeout: 60000 });
+  await page.waitForFunction(() => window.__md.songs.size > 5000 && !window.__md.sync.busy, null, { timeout: 60000 });
   await page.waitForTimeout(2800);
   // 1) Hakkı Bulut klasörüne gir, bir şarkıyı favori yap
-  await page.locator('.item', { hasText: '2.Slov Fantazi Tsm' }).first().click();
+  await page.locator('.item', { hasText: 'Sanatçılar' }).first().click();
   await page.locator('.item', { hasText: 'Hakkı Bulut' }).first().click();
-  const before = await page.evaluate(() => [...window.__md.songs.keys()].filter(p => p.startsWith('2.Slov Fantazi Tsm/Hakkı Bulut/')));
+  const before = await page.evaluate(() => [...window.__md.songs.keys()].filter(p => p.startsWith('Sanatçılar/Hakkı Bulut/')));
   await page.locator('#list .item').first().click();
   await page.click('#songToolbar button[title="Favori"]');
   // 2) taşı: Arabesk/Hakkı Bulut
@@ -40,7 +40,7 @@ const trees = [], commits = [], patches = [], puts = [];
   await page.fill('.modal-card input', 'Arabesk/Hakkı Bulut'); await page.click('.modal-card >> text=OK');
   await page.waitForTimeout(1500);
   const after = await page.evaluate(() => [...window.__md.songs.keys()].filter(p => p.startsWith('Arabesk/Hakkı Bulut/')));
-  console.log('taşınan', before.length, '->', after.length, '| eski kalan:', await page.evaluate(() => [...window.__md.songs.keys()].filter(p => p.startsWith('2.Slov Fantazi Tsm/Hakkı Bulut/')).length));
+  console.log('taşınan', before.length, '->', after.length, '| eski kalan:', await page.evaluate(() => [...window.__md.songs.keys()].filter(p => p.startsWith('Sanatçılar/Hakkı Bulut/')).length));
   const t = trees[0].tree; console.log('commit:', commits.map(c => c.message), '| ağaç girdisi', t.length, 'ekle', t.filter(e => e.sha).length, 'sil', t.filter(e => e.sha === null).length, '| içerik yüklemesi(PUT):', puts.filter(p => p.startsWith('repertuar/')).length);
   console.log('dir:', await page.evaluate(() => window.__md.dir), '| fav:', await page.evaluate(() => window.__md.programs.fav));
   await page.screenshot({ path: (process.env.OUT || '/tmp') + '/folder-moved.png' });
@@ -50,15 +50,15 @@ const trees = [], commits = [], patches = [], puts = [];
     '| kalan:', await page.evaluate(() => [...window.__md.songs.keys()].filter(p => p.startsWith('Arabesk/')).length), '| fav:', await page.evaluate(() => window.__md.programs.fav));
   // 4) büyük klasör: Yeni -> Yeni Arşiv (yazarak onay yok, sadece süre ölç)
   await page.click('.crumb >> nth=0');
-  await page.locator('.item', { hasText: 'Yeni' }).last().click();
+  await page.locator('.item', { hasText: 'Karışık (türü belirsiz)' }).first().click();
   const t0 = Date.now();
   await page.click('button[title="Klasörü yeniden adlandır / taşı"]');
   await page.fill('.modal-card input', 'Yeni Arşiv'); await page.click('.modal-card >> text=OK');
   await page.waitForFunction(() => window.__md.dir === 'Yeni Arşiv', null, { timeout: 120000 });
   const tc = trees.slice(-20).filter(x => x.tree.some(e => e.path.startsWith('repertuar/Yeni Arşiv/')));
-  console.log('Yeni (13k) taşıma süresi', Date.now() - t0, 'ms | ağaç parçası', tc.length, '| commit:', commits[commits.length - 1].message, '| şarkı:', await page.evaluate(() => [...window.__md.songs.keys()].filter(p => p.startsWith('Yeni Arşiv/')).length));
+  console.log('Büyük klasör taşıma süresi', Date.now() - t0, 'ms | ağaç parçası', tc.length, '| commit:', commits[commits.length - 1].message, '| şarkı:', await page.evaluate(() => [...window.__md.songs.keys()].filter(p => p.startsWith('Yeni Arşiv/')).length));
   // 5) yeniden açılış: kalıcı mı
   await page.reload(); await page.waitForTimeout(3000);
-  console.log('yeniden açılış: Yeni Arşiv', await page.evaluate(() => [...window.__md.songs.keys()].filter(p => p.startsWith('Yeni Arşiv/')).length), 'eski Yeni/', await page.evaluate(() => [...window.__md.songs.keys()].filter(p => p.startsWith('Yeni/')).length));
+  console.log('yeniden açılış: Yeni Arşiv', await page.evaluate(() => [...window.__md.songs.keys()].filter(p => p.startsWith('Yeni Arşiv/')).length), 'eski Yeni/', await page.evaluate(() => [...window.__md.songs.keys()].filter(p => p.startsWith('Karışık (türü belirsiz)/')).length));
   console.log('ERR', errors); await browser.close();
 })();
