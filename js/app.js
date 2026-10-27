@@ -6,7 +6,7 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '5.6.1';
+export const VERSION = '5.7.0';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -283,6 +283,48 @@ function songItem(p, { sub, html, acts, ctx, tapMenu } = {}) {
   return el;
 }
 
+function renderEmptyLib(list, dirs, files) {
+  if (dirs.length || files.length) return;
+  list.append(h('div', { class: 'list-note' }, S.songs.size ? (VIEW_ONLY ? '—' : t('emptyFolder')) : t('welcomeText')));
+  if (S.dir && S.virtualDirs.has(S.dir)) list.append(h('button', { class: 'small-btn', style: 'margin:0 12px', onclick: () => deleteEmptyFolder(S.dir) }, '🗑 ' + t('deleteFolder')));
+}
+
+// ------------------------------------------------------------------ klasör ağacı: klasöre dokununca içi hemen altında açılır
+const OPEN_KEY = 'md.openDirs';
+const openDirs = (() => { try { return new Set(JSON.parse(localStorage.getItem(OPEN_KEY) || '[]')); } catch (_) { return new Set(); } })();
+const treeLimit = new Map();
+function toggleDir(d) {
+  if (openDirs.has(d)) { for (const x of [...openDirs]) if (x === d || x.startsWith(d + '/')) openDirs.delete(x); }
+  else openDirs.add(d);
+  try { localStorage.setItem(OPEN_KEY, JSON.stringify([...openDirs])); } catch (_) {}
+  const sc = $('list').scrollTop; renderList(); $('list').scrollTop = sc;
+}
+function renderTree(list, dir, level) {
+  const { dirs, files } = orderedChildren(dir);
+  for (const d of dirs) {
+    const open = openDirs.has(d);
+    const row = h('div', { class: 'item tree-dir' + (open ? ' open' : ''), role: 'button', tabindex: 0, style: `--lvl:${level}`, 'data-d': d,
+        onkeydown: e => { if (e.key === 'Enter') toggleDir(d); } },
+      h('span', { class: 'chev' }, open ? '▾' : '▸'),
+      h('span', { class: 'ico' }, open ? '📂' : '📁'),
+      h('span', { class: 'main' }, h('span', { class: 'name' }, baseName(d))),
+      h('span', { class: 'count' }, countIn(d)));
+    addTaps(row, () => toggleDir(d), () => openFolderSheet(d)); addLongPress(row, () => openFolderSheet(d));
+    list.append(row);
+    if (open) renderTree(list, d, level + 1);
+  }
+  const ctx = { list: files, label: dir || t('root') };
+  const lim = level === 0 ? S.limit : (treeLimit.get(dir) || 200);
+  for (const p of files.slice(0, lim)) {
+    const it = songItem(p, { ctx, sub: '', tapMenu: true });
+    it.classList.add('tree-song'); it.style.setProperty('--lvl', level);
+    list.append(it);
+  }
+  if (files.length > lim) list.append(h('button', { class: 'small-btn tree-more', style: `--lvl:${level}`, onclick: () => {
+    if (level === 0) S.limit += 300; else treeLimit.set(dir, lim + 300);
+    const sc = $('list').scrollTop; renderList(); $('list').scrollTop = sc; } }, t('showMore', { n: files.length - lim })));
+}
+
 // ------------------------------------------------------------------ sıralama · çoklu seçim · çift dokunuş
 /** Kullanıcının belirlediği sıra (siralama.json, tüm cihazlara senkron). Sırası olmayanlar alfabetik, sona. */
 function orderedChildren(dir) {
@@ -489,6 +531,7 @@ function renderList() {
     const moveBtns = (p) => S.sortMode ? h('span', { class: 'acts sort-acts' },
       h('button', { class: 'sort-btn', onclick: e => { e.stopPropagation(); moveItem(S.dir, all, p, -1); } }, '▲'),
       h('button', { class: 'sort-btn', onclick: e => { e.stopPropagation(); moveItem(S.dir, all, p, 1); } }, '▼')) : null;
+    if (!S.sortMode && !S.sel) { renderTree(list, S.dir, 0); renderEmptyLib(list, dirs, files); return; }
     for (const d of dirs) {
       const row = h('div', { class: 'item' + (S.sortMode ? ' sorting' : ''), role: 'button', tabindex: 0,
           onkeydown: e => { if (e.key === 'Enter') goDir(d); } },
@@ -505,10 +548,7 @@ function renderList() {
       else { const it = songItem(p, { ctx, sub: '', tapMenu: true }); list.append(it); }
     }
     if (files.length > S.limit) list.append(h('button', { class: 'small-btn', style: 'margin:10px', onclick: () => { S.limit += 300; renderList(); } }, t('showMore', { n: files.length - S.limit })));
-    if (!dirs.length && !files.length) {
-      list.append(h('div', { class: 'list-note' }, S.songs.size ? (VIEW_ONLY ? '—' : t('emptyFolder')) : t('welcomeText')));
-      if (S.dir && S.virtualDirs.has(S.dir)) list.append(h('button', { class: 'small-btn', style: 'margin:0 12px', onclick: () => deleteEmptyFolder(S.dir) }, '🗑 ' + t('deleteFolder')));
-    }
+    renderEmptyLib(list, dirs, files);
     return;
   }
 
@@ -583,6 +623,7 @@ function goHome() {
   $('editor').hidden = true;
   setNarrowSong(false);
   S.programId = null;
+  openDirs.clear(); try { localStorage.setItem(OPEN_KEY, '[]'); } catch (_) {}   // ⌂ = açık klasörler kapanır
   goDir('');
 }
 
@@ -2027,4 +2068,4 @@ async function start() {
 }
 
 start();
-window.__md = S; window.__mdVersion = VERSION; // hata ayıklama için
+window.__md = S; window.__mdVersion = VERSION; window.__mdGo = d => goDir(d); // hata ayıklama için

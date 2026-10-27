@@ -18,7 +18,7 @@ const puts = [];
   await page.evaluate(() => { localStorage.clear(); localStorage.setItem('md.lang', 'tr'); localStorage.setItem('md.settings.backup.v1', JSON.stringify({ gh: { owner: 'H', repo: 'r', branch: 'main', token: 'x' }, font: 22, stageFont: 34, speed: 30, _savedAt: Date.now() })); });
   await page.reload();
   await page.waitForFunction(() => window.__md.songs.size > 5000 && !window.__md.sync.busy, null, { timeout: 60000 }); await page.waitForTimeout(2600);
-  await page.locator('.item', { hasText: 'KINA' }).first().click(); await page.waitForTimeout(500);
+  await page.evaluate(() => window.__mdGo('KINA')); await page.waitForTimeout(500);
   await page.locator('#list .item[data-p]').first().click(); await page.waitForTimeout(800);
   const O = process.env.OUT || '/tmp';
   await page.click('#phoneBar button:has-text("⋯")'); await page.waitForTimeout(300);

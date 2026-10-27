@@ -30,10 +30,9 @@ const trees = [], commits = [], patches = [], puts = [];
   await page.waitForFunction(() => window.__md.songs.size > 5000 && !window.__md.sync.busy, null, { timeout: 60000 });
   await page.waitForTimeout(2800);
   // 1) Hakkı Bulut klasörüne gir, bir şarkıyı favori yap
-  await page.locator('.item', { hasText: 'Sanatçılar' }).first().click(); await page.waitForTimeout(450);
-  await page.locator('.item', { hasText: 'Hakkı Bulut' }).first().click(); await page.waitForTimeout(450);
+  await page.evaluate(() => window.__mdGo('Sanatçılar/Hakkı Bulut')); await page.waitForTimeout(450);
   const before = await page.evaluate(() => [...window.__md.songs.keys()].filter(p => p.startsWith('Sanatçılar/Hakkı Bulut/')));
-  await page.locator('#list .item').first().click(); await page.waitForTimeout(450);
+  await page.locator('#list .item[data-p]').first().click(); await page.waitForTimeout(450);
   await page.click('#songToolbar button[title="Favori"]');
   // 2) taşı: Arabesk/Hakkı Bulut
   await page.click('button[title="Klasörü yeniden adlandır / taşı"]');
@@ -50,7 +49,7 @@ const trees = [], commits = [], patches = [], puts = [];
     '| kalan:', await page.evaluate(() => [...window.__md.songs.keys()].filter(p => p.startsWith('Arabesk/')).length), '| fav:', await page.evaluate(() => window.__md.programs.fav));
   // 4) büyük klasör: Yeni -> Yeni Arşiv (yazarak onay yok, sadece süre ölç)
   await page.click('.crumb >> nth=0');
-  await page.locator('.item', { hasText: 'Yeni' }).last().click(); await page.waitForTimeout(450);
+  await page.evaluate(() => window.__mdGo('Yeni')); await page.waitForTimeout(450);
   const t0 = Date.now();
   await page.click('button[title="Klasörü yeniden adlandır / taşı"]');
   await page.fill('.modal-card input', 'Yeni Arşiv'); await page.click('.modal-card >> text=OK');

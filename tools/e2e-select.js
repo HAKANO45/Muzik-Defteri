@@ -24,7 +24,7 @@ const trees = [], commits = [];
   await page.reload();
   await page.waitForFunction(() => window.__md.songs.size > 5000 && !window.__md.sync.busy, null, { timeout: 60000 }); await page.waitForTimeout(2600);
   const O = process.env.OUT || '/tmp';
-  await page.locator('.item', { hasText: 'KINA' }).first().click(); await page.waitForTimeout(500);
+  await page.evaluate(() => window.__mdGo('KINA')); await page.waitForTimeout(500);
   // sırala
   await page.click('.side-head .small-btn:has-text("↕")'); await page.waitForTimeout(200);
   const before = await page.$$eval('#list .item .name', e => e.slice(0,4).map(x => x.firstChild.textContent));

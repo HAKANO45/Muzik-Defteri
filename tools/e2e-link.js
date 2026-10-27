@@ -44,7 +44,7 @@ async function mk(b, name, dev) {
   await B.page.fill('.modal-card input.field >> nth=0', 'Hakan');
   await B.page.click('.link-big'); await B.page.waitForTimeout(800);
   // A şarkı açar → B'de açılmalı
-  await A.page.locator('.item', { hasText: 'KINA' }).first().click(); await A.page.waitForTimeout(500);
+  await A.page.evaluate(() => window.__mdGo('KINA')); await A.page.waitForTimeout(500);
   await A.page.locator('#list .item[data-p]').first().click(); await A.page.waitForTimeout(1500);
   const a1 = await A.page.evaluate(() => window.__md.current);
   await B.page.waitForTimeout(1500);
@@ -52,7 +52,7 @@ async function mk(b, name, dev) {
   console.log('A açtı', a1, '→ B', b1, b1 === a1 ? 'OK' : 'HATA');
   await A.page.screenshot({ path: O + '/l2.png' }); await B.page.screenshot({ path: O + '/l3.png' });
   // B ileri → A
-  await B.page.locator('.item', { hasText: 'KINA' }).first().click(); await B.page.waitForTimeout(500);
+  await B.page.evaluate(() => window.__mdGo('KINA')); await B.page.waitForTimeout(500);
   await B.page.locator('#list .item[data-p]').nth(1).click(); await B.page.waitForTimeout(1500);
   const b2 = await B.page.evaluate(() => window.__md.current); await A.page.waitForTimeout(1500);
   const a2 = await A.page.evaluate(() => window.__md.current);

@@ -447,3 +447,11 @@ input, textarea, select { font: inherit; color: var(--text); }
   #btnHome.only-narrow { display: inline-flex; align-items: center; justify-content: center; min-width: calc(48px * var(--ui)); height: calc(42px * var(--ui));
     border-radius: 12px; border: 2px solid var(--gold); background: var(--gold); color: var(--on-gold); font-size: calc(26px * var(--ui)); font-weight: 700; }
 }
+
+/* klasör ağacı */
+.item.tree-dir, .item.tree-song { padding-left: calc(10px + var(--lvl, 0) * 26px * var(--ui)); }
+.item.tree-dir .chev { width: calc(20px * var(--ui)); flex: none; color: var(--gold); font-size: calc(18px * var(--ui)); text-align: center; }
+.item.tree-dir.open { background: var(--soft); }
+.item.tree-dir.open .name { color: var(--gold2); font-weight: 700; }
+.item.tree-song { position: relative; }
+.tree-more { margin: 8px 10px 8px calc(10px + var(--lvl, 0) * 26px * var(--ui)); }
