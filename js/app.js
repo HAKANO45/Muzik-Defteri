@@ -1,12 +1,13 @@
 // Müzik Defteri v4 — ana uygulama
 import { db, requestPersist, loadSettingsReliably, persistSettingsReliably } from './db.js';
 import { GitHub } from './github.js';
-import { bytesToSong, songToBytes, ENC_LABEL } from './encoding.js';
+import { bytesToSong, songToBytes, ENC_LABEL, gitBlobSha } from './encoding.js';
 import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
+import { suggest, fixAll, fixName, mostlyUpper, toSentence, tidyBlank } from './turkce.js';
 
-export const VERSION = '5.8.0';
+export const VERSION = '5.9.0';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -659,6 +660,7 @@ function openFolderSheet(d) {
       act('＋📁', t('newFolderInside'), () => newFolder(d)),
       act('⧉', t('copy'), () => copyFolder(d)),
       act('➜', t('move'), () => moveFolder(d)),
+      VIEW_ONLY ? null : act('🔤', t('fixFolder'), () => fixFolder(d)),
       act('🗑', t('delete'), () => deleteFolder(d), 'danger')),
     h('button', { class: 'btn sheet-close', onclick: closeModal }, t('close')));
   $('modal').classList.add('sheet');
@@ -756,7 +758,7 @@ async function commitFolderChange(songs, changes, message) {
   }
   try {
     S.sync.busy = true; updateSyncDot();
-    await g.commitBatch(changes.map(({ path, sha, delete: del }) => ({ path, sha, delete: del })), message,
+    await g.commitBatch(changes.map(({ path, sha, bytes, delete: del }) => ({ path, sha, bytes, delete: del })), message,
       (i, n) => toast(`⟳ ${i}/${n}`));
     return true;
   } catch (e) {
@@ -1316,6 +1318,7 @@ function openEditor(p, draft) {
     ta,
     h('div', { class: 'btn-row' },
       h('button', { class: 'btn primary', onclick: save }, t('save')),
+      h('button', { class: 'btn fix-btn', onclick: () => openFixDialog(ta, isNew ? null : nameIn, save) }, '🔤 ' + t('fixTitle')),
       h('button', { class: 'btn', onclick: cancel }, t('cancel')),
       rec ? h('span', { class: 'hint', style: 'align-self:center' }, t('encoding') + ': ' + (ENC_LABEL[rec.e] || rec.e)) : null),
   ].filter(Boolean));
@@ -1324,6 +1327,139 @@ function openEditor(p, draft) {
   setNarrowSong(true);
   updateHint();
   if (!draft) (rec ? ta : artistIn).focus();
+}
+
+// ------------------------------------------------------------------ 🔤 Düzelt (Türkçe harf + biçim)
+let LEX = null;
+async function refreshLexicon(g) {
+  const st = await g.stat('bundle/sozluk.json.gz'); if (!st) return;
+  const cur = LEX || await db.get('sozluk');
+  if (cur && cur.sha === st.sha) { LEX = cur; return; }
+  const bytes = await g.getRaw('bundle/sozluk.json.gz');
+  const txt = await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+  LEX = { sha: st.sha, w: JSON.parse(txt).w };
+  await db.set('sozluk', LEX);
+}
+async function getLexicon() {
+  if (LEX) return LEX.w;
+  LEX = await db.get('sozluk');
+  if (LEX) return LEX.w;
+  const g = gh();
+  if (!g.ok || !navigator.onLine) { toast(t('fixNeedLex')); return null; }
+  toast(t('fixLoading'));
+  try { await refreshLexicon(g); } catch (e) { toast(t('syncError', { msg: e.message })); return null; }
+  return LEX ? LEX.w : null;
+}
+function markFixes(text, words, skip) {
+  // önizleme: düzeltilen kelimeler işaretli
+  const map = new Map(words.filter(w => !skip.has(w.from)).map(w => [w.from, w.to]));
+  return escapeHtml(text).replace(/[A-Za-zÇĞİÖŞÜçğıöşüÂÎÛâîû]+/g, w => map.has(w) ? `<mark class="fix">${escapeHtml(map.get(w))}</mark>` : w);
+}
+
+/** Düzenleme ekranı: öneriler ✓/✕, biçim seçenekleri, uygula ve kaydet */
+async function openFixDialog(ta, nameIn, save) {
+  const lex = await getLexicon(); if (!lex) return;
+  const text = ta.value.replace(/\r\n?/g, '\n');
+  const words = suggest(text, lex);
+  const skip = new Set();
+  const opt = { upper: mostlyUpper(text), blank: tidyBlank(text) !== text, name: false };
+  const oldName = nameIn ? nameIn.value : '';
+  const newName = nameIn ? fixName(oldName, lex) : '';
+  opt.name = !!nameIn && newName !== oldName;
+  const prev = h('pre', { class: 'fix-prev lyrics' });
+  const draw = () => { const out = fixAll(text, lex, { upper: opt.upper, blank: opt.blank, skip }); prev.innerHTML = markFixes(opt.upper ? text : out, words, skip); if (opt.upper) prev.textContent = out; };
+  const sugList = h('div', { class: 'fix-list' }, ...words.map(w => {
+    const row = h('div', { class: 'fix-sug' },
+      h('span', { class: 'w' }, h('s', {}, w.from), ' → ', h('b', {}, w.to), w.n > 1 ? h('small', {}, ` ×${w.n}`) : ''),
+      h('button', { class: 'fix-ok on', onclick: () => { skip.delete(w.from); row.classList.remove('off'); draw(); } }, '✓'),
+      h('button', { class: 'fix-no', onclick: () => { skip.add(w.from); row.classList.add('off'); draw(); } }, '✕'));
+    return row;
+  }));
+  const chip = (key, label, show = true) => show ? h('button', { class: 'chip-opt' + (opt[key] ? ' on' : ''), onclick: e => { opt[key] = !opt[key]; e.currentTarget.classList.toggle('on', opt[key]); draw(); } }, label) : null;
+  const apply = () => {
+    ta.value = fixAll(text, lex, { upper: opt.upper, blank: opt.blank, skip });
+    if (nameIn && opt.name) nameIn.value = newName;
+    closeModal(); save();
+  };
+  draw();
+  modal(
+    h('div', { class: 'modal-head' }, h('h2', {}, '🔤 ' + t('fixTitle')), h('button', { class: 'mh-btn', onclick: closeModal }, '✕')),
+    prev,
+    h('h3', {}, t('fixWords', { n: words.length })),
+    words.length ? sugList : h('p', { class: 'hint' }, t('fixNone')),
+    h('h3', {}, t('fixFormat')),
+    h('div', { class: 'chip-row' },
+      chip('upper', t('fixUpper')), chip('blank', t('fixBlank')),
+      chip('name', t('fixName') + (newName !== oldName ? ': ' + newName : ''), !!nameIn && newName !== oldName)),
+    h('div', { class: 'btn-row' }, h('button', { class: 'btn primary fix-apply', onclick: apply }, '✓ ' + t('fixApply')), h('button', { class: 'btn', onclick: closeModal }, t('cancel'))),
+    h('p', { class: 'hint' }, t('fixNote')),
+  );
+}
+
+/** Klasörün tamamında düzelt: önce liste, onay, tek commit (kodlama korunur). */
+async function fixFolder(d) {
+  if (VIEW_ONLY) { toast(t('viewOnly')); return; }
+  const lex = await getLexicon(); if (!lex) return;
+  const opt = { turkish: true, blank: true, upper: false, name: true };
+  const all = songsUnder(d);
+  const box = h('div', { class: 'fix-folder-list' });
+  const info = h('h3', {});
+  let rows = [];
+  const scan = () => {
+    rows = [];
+    for (const r of all) {
+      const text = fixAll(r.t, lex, opt);
+      const stem = baseName(r.p).replace(/\.txt$/i, '');
+      const ns = opt.name ? fixName(stem, lex) : stem;
+      if (text === r.t && ns === stem) continue;
+      const ex = opt.turkish ? suggest(r.t, lex).slice(0, 4).map(w => w.from + '→' + w.to).join(', ') : '';
+      rows.push({ r, text, np: ns !== stem ? (dirName(r.p) ? dirName(r.p) + '/' : '') + ns + '.txt' : null, ex, on: true });
+    }
+    info.textContent = t('fixFound', { n: rows.length, m: all.length });
+    box.replaceChildren(...rows.slice(0, 400).map(x => {
+      const cb = h('input', { type: 'checkbox', checked: true, onchange: () => { x.on = cb.checked; } });
+      return h('label', { class: 'fix-frow' }, cb, h('span', {}, h('b', {}, showTitle(x.r._title)), x.np ? h('small', { class: 'nm' }, ' → ' + baseName(x.np)) : '', h('small', {}, (x.ex || t('fixFormatOnly')))));
+    }));
+    if (rows.length > 400) box.append(h('p', { class: 'hint' }, t('fixMore', { n: rows.length - 400 })));
+  };
+  const chip = (key, label) => h('button', { class: 'chip-opt' + (opt[key] ? ' on' : ''), onclick: e => { opt[key] = !opt[key]; e.currentTarget.classList.toggle('on', opt[key]); scan(); } }, label);
+  const run = async () => {
+    const sel = rows.slice(0, 400).filter(x => x.on);
+    if (!sel.length) return;
+    if (!(await confirmBox(t('fixConfirm', { n: sel.length })))) { return; }
+    const changes = [], prepared = [];
+    for (const x of sel) {
+      let e = x.r.e; if (e === 'ascii' && /[^\x00-\x7f]/.test(x.text)) e = 'cp1254';
+      const { bytes, enc } = songToBytes({ t: x.text, e, n: x.r.n });
+      const path = x.np || x.r.p;
+      changes.push({ path: 'repertuar/' + path, bytes });
+      if (x.np && x.np !== x.r.p) changes.push({ path: 'repertuar/' + x.r.p, delete: true });
+      prepared.push({ x, bytes, enc, path });
+    }
+    if (!(await commitFolderChange(sel.map(x => x.r), changes, `Türkçe harf düzeltildi: ${sel.length} şarkı (${d})`))) return;
+    const dels = [], map = new Map(), puts = [];
+    for (const { x, bytes, enc, path } of prepared) {
+      const sha = await gitBlobSha(bytes);
+      const ok = gh().ok;
+      const nr = decorate({ p: path, t: x.text, e: enc, n: x.r.n, s: ok ? sha : x.r.s, dirty: !ok, m: Date.now(), ...(ok ? { up: sha, upAt: Date.now() } : {}) });
+      S.songs.set(path, nr); puts.push(strip(nr));
+      if (path !== x.r.p) { S.songs.delete(x.r.p); dels.push(x.r.p); map.set(x.r.p, path); }
+    }
+    await db.putSongs(puts);
+    if (dels.length) { await db.deleteSongs(dels); markRemoved(dels); remapPaths(map); }
+    closeModal(); rebuildIndex(); renderList();
+    if (S.current && S.songs.has(S.current) && $('editor').hidden) renderSong();
+    scheduleSync(800); toast(t('fixDone', { n: sel.length }));
+  };
+  scan();
+  modal(
+    h('div', { class: 'modal-head' }, h('h2', {}, '🔤 ' + t('fixFolder')), h('button', { class: 'mh-btn', onclick: closeModal }, '✕')),
+    h('p', { class: 'hint' }, '📁 ' + d + ' · ' + t('songs', { n: all.length })),
+    h('div', { class: 'chip-row' }, chip('turkish', t('fixTurkish')), chip('upper', t('fixUpper')), chip('blank', t('fixBlank')), chip('name', t('fixNames'))),
+    info, box,
+    h('div', { class: 'btn-row' }, h('button', { class: 'btn primary fix-apply', onclick: run }, '✓ ' + t('fixApplyFolder')), h('button', { class: 'btn', onclick: closeModal }, t('cancel'))),
+    h('p', { class: 'hint' }, t('fixNote')),
+  );
 }
 
 async function saveSong(oldPath, newPath, text) {
@@ -1497,6 +1633,8 @@ async function sync({ quiet = false } = {}) {
       S.sync.bundleSha = st.sha;
       await db.set('bundleSha', st.sha);
     }
+    // 1b) Türkçe harf sözlüğü (🔤 Düzelt) — hata olursa senkron durmaz
+    try { await refreshLexicon(g); } catch (e) { console.warn('sözlük', e); }
     // 2) Yerel değişiklikleri gönder
     const dirty = [...S.songs.values()].filter(s => s.dirty);
     if (dirty.length > 50 && !quiet && !(await confirmBox(t('pushConfirm', { n: dirty.length })))) dirty.length = 0;

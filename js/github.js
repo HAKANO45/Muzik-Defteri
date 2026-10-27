@@ -104,16 +104,16 @@ export class GitHub {
       const head = ref.object.sha;
       const commit = await (await this.call('GET', `${api}/commits/${head}`)).json();
       let tree = commit.tree.sha;
-      const entries = [];
-      for (const c of changes) {
-        if (c.delete) entries.push({ path: c.path, mode: '100644', type: 'blob', sha: null });
-        else if (c.sha) entries.push({ path: c.path, mode: '100644', type: 'blob', sha: c.sha });
-        else {
+      // yeni içerikler: blob'lar 6'şar paralel yüklenir (toplu Türkçe harf düzeltmesi vb.)
+      const need = changes.filter(c => !c.delete && !c.sha);
+      for (let i = 0; i < need.length; i += 6) {
+        await Promise.all(need.slice(i, i + 6).map(async c => {
           const blob = await (await this.call('POST', `${api}/blobs`, { body: { content: toBase64(c.bytes), encoding: 'base64' } })).json();
           c.sha = blob.sha;
-          entries.push({ path: c.path, mode: '100644', type: 'blob', sha: blob.sha });
-        }
+        }));
+        onProgress && need.length > 12 && onProgress(Math.min(i + 6, need.length), need.length);
       }
+      const entries = changes.map(c => ({ path: c.path, mode: '100644', type: 'blob', sha: c.delete ? null : c.sha }));
       for (let i = 0; i < entries.length; i += 2000) {
         onProgress && onProgress(Math.min(i + 2000, entries.length), entries.length);
         const tr = await (await this.call('POST', `${api}/trees`, { body: { base_tree: tree, tree: entries.slice(i, i + 2000) } })).json();
