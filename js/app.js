@@ -6,7 +6,7 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '5.3.0';
+export const VERSION = '5.3.1';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -184,7 +184,6 @@ function saveNotes() { S.notes.dirty = true; db.set('notes', S.notes); scheduleS
 
 /** Not penceresi: Solist, Ton, kısa not. iPhone'da açılmaz (sadece görüntüleme). */
 function openNoteDialog(p) {
-  if (VIEW_ONLY) { toast(t('viewOnly')); return; }
   const cur = S.notes.notes[p] || {};
   const solistIn = h('input', { class: 'field', value: cur.solist || '', placeholder: 'Eylem, Hakan, Eylem & Hakan…', list: 'solistList', autocapitalize: 'words' });
   const dl = h('datalist', { id: 'solistList' }, allSolists().map(s => h('option', { value: s })));
@@ -863,7 +862,7 @@ function renderSong() {
   renderPhoneBar(rec, idx);
   $('songTitle').textContent = rec._title;
   $('songNote').replaceChildren(...noteChips(noteOf(rec.p)),
-    VIEW_ONLY ? '' : h('button', { class: 'chip chip-add', title: t('songNote'), onclick: () => openNoteDialog(rec.p) }, noteOf(rec.p) ? '✎' : '＋ ' + t('songNote')));
+    h('button', { class: 'chip chip-add', title: t('songNote'), onclick: () => openNoteDialog(rec.p) }, noteOf(rec.p) ? '✎' : '＋ ' + t('songNote')));
   const meta = $('songMeta'); meta.replaceChildren();
   const d = dirName(rec.p);
   if (idx >= 0) meta.append(h('span', { class: 'pos only-phone' }, `${idx + 1}/${S.context.list.length}`));
@@ -914,12 +913,15 @@ function openSongSheet(rec) {
   modal(
     h('div', { class: 'sheet-grab' }),
     h('div', { class: 'sheet-title' }, rec._title),
+    // Not (solist · ton · BPM · style · not) — iPhone'da da düzenlenebilir (söz değil)
+    h('button', { class: 'sheet-note-btn', onclick: () => { closeModal(); openNoteDialog(rec.p); } },
+      h('span', { class: 'sheet-note-head' }, '🏷 ' + t('songNote') + ' — 🎤 ' + t('solist') + ' · 🎵 ' + t('ton') + ' · BPM · 🥁 Style'),
+      noteOf(rec.p) ? h('span', { class: 'sheet-note-chips' }, ...noteChips(noteOf(rec.p))) : h('span', { class: 'sheet-note-empty' }, '＋ ' + t('noteAddLong'))),
     h('div', { class: 'sheet-grid' },
       act(isFav ? '★' : '☆', isFav ? t('unfavorite') : t('favorite'), () => toggleFav(rec.p), isFav ? 'on' : ''),
       act('＋', t('addToProgram'), () => addToProgramDialog(rec.p)),
       act('⛶', t('stage'), openStage),
       act('🔎', t('searchWeb'), () => webSearch(rec._title)),
-      VIEW_ONLY ? null : act('🏷', t('songNote'), () => openNoteDialog(rec.p)),
       VIEW_ONLY ? null : act('✎', t('edit'), () => openEditor(rec.p)),
       VIEW_ONLY ? null : act('🗑', t('delete'), () => deleteSong(rec.p), 'danger')),
     stepper(t('speed'), speedVal, () => { setSpeed(-5); speedVal.textContent = S.settings.speed; }, () => { setSpeed(5); speedVal.textContent = S.settings.speed; }),
