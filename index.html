@@ -19,6 +19,7 @@
 <div id="app">
   <header class="topbar">
     <button class="icon-btn only-narrow" id="btnBack" hidden aria-label="Geri">‹</button>
+    <button class="icon-btn only-wide" id="btnPanel" title="Listeyi gizle / göster">☰</button>
     <div class="brand"><span class="brand-note">♪</span><span id="brandName">MÜZİK DEFTERİ</span></div>
     <div class="clock" id="clock" aria-label="Saat">00:00<span class="sec">:00</span></div>
     <div class="top-actions">
@@ -42,13 +43,16 @@
       </nav>
       <div class="side-head" id="sideHead"></div>
       <div class="list" id="list"></div>
+      <div class="list-size" id="listSize"></div>
     </aside>
+    <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" title="Sürükle: genişlik · Çift tık: sıfırla"></div>
 
     <section class="viewer" id="viewer">
       <div class="empty" id="empty">
         <div class="empty-note">♪</div>
         <div id="emptyText"></div>
       </div>
+      <button class="unfold-btn" id="unfoldBtn" hidden title="Araç çubuğunu göster">▾</button>
       <div class="song" id="song" hidden>
         <div class="song-toolbar" id="songToolbar"></div>
         <div class="song-scroll" id="songScroll">

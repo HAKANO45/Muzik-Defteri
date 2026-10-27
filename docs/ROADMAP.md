@@ -1,5 +1,11 @@
 # Yol haritası
 
+## v4.7.0 — tamam
+- Okuma alanı: liste ile şarkı arasındaki çizgi sürüklenerek genişlik ayarlanır (çift tık = sıfırla)
+- ☰ / L tuşu: listeyi gizle → şarkı tam genişlik
+- ▴: araç çubuğunu ve bilgi satırını katla (▾ ile geri); liste yazı boyu a− / a+
+- Tüm ayarlar cihaz başına hatırlanır; iPhone düzeni değişmedi
+
 ## v4.6.0 — tamam
 - Klasör düzenleme (Windows/Mac/iPad): ✎📁 yeniden adlandır veya taşı ("Arabesk/Müslüm Gürses" gibi tam yol), 🗑📁 sil (20+ şarkıda klasör adını yazarak onay)
 - GitHub'da tek commit (Git Data API): içerik yeniden yüklenmez, 13 bin şarkılık klasör bile birkaç saniyede; favori/not/program yolları otomatik güncellenir

@@ -9,6 +9,7 @@ const STR = {
     results: '{n} sonuç', noResults: 'Sonuç yok', songs: '{n} şarkı', folders: '{n} klasör',
     showMore: 'Daha fazla göster ({n})', root: 'Repertuvar',
     back: 'Geri', close: 'Kapat', save: 'Kaydet', cancel: 'Vazgeç', delete: 'Sil', edit: 'Düzenle',
+    togglePanel: 'Listeyi gizle / göster (L)', hideToolbar: 'Araç çubuğunu gizle (okuma alanı büyür)', listSizeLabel: 'Liste:',
     renameFolder: 'Klasörü yeniden adlandır / taşı', renameFolderPrompt: 'Yeni klasör adı (taşımak için tam yol: Arabesk/Müslüm Gürses)',
     confirmDeleteFolder: '"{name}" klasörü ve içindeki {n} şarkı silinsin mi? (GitHub geçmişinden geri alınabilir)',
     typeToConfirm: 'Onay için klasör adını yaz: {name}', cancelled: 'Vazgeçildi', needOnline: 'Bu işlem için internet gerekli',
@@ -45,7 +46,7 @@ const STR = {
     connectGithub: 'GitHub bağla', orLocal: 'veya bu cihazdan yükle:',
     install: 'Uygulamayı yükle', installIos: 'iPhone/iPad: Paylaş ⬆ → "Ana Ekrana Ekle"',
     updateReady: 'Yeni sürüm hazır', reload: 'Yenile', version: 'Sürüm',
-    keyboardHelp: 'Klavye / pedal: ← → şarkı değiştir · PageDown/PageUp sayfa (sonda sonraki şarkı) · Boşluk otomatik kaydır · F sahne · Ctrl+F ara',
+    keyboardHelp: 'Klavye / pedal: ← → şarkı değiştir · PageDown/PageUp sayfa (sonda sonraki şarkı) · Boşluk otomatik kaydır · F sahne · L liste gizle · Ctrl+F ara',
     clock24: '24 saat', pushConfirm: '{n} değişiklik GitHub\'a gönderilecek. Devam?', chords: 'Akor',
   },
   en: {
@@ -55,6 +56,7 @@ const STR = {
     results: '{n} results', noResults: 'No results', songs: '{n} songs', folders: '{n} folders',
     showMore: 'Show more ({n})', root: 'Repertoire',
     back: 'Back', close: 'Close', save: 'Save', cancel: 'Cancel', delete: 'Delete', edit: 'Edit',
+    togglePanel: 'Hide / show list (L)', hideToolbar: 'Hide toolbar (bigger reading area)', listSizeLabel: 'List:',
     renameFolder: 'Rename / move folder', renameFolderPrompt: 'New folder name (full path to move: Arabesk/Müslüm Gürses)',
     confirmDeleteFolder: 'Delete folder "{name}" and its {n} songs? (recoverable from GitHub history)',
     typeToConfirm: 'Type the folder name to confirm: {name}', cancelled: 'Cancelled', needOnline: 'Internet required for this',
@@ -91,7 +93,7 @@ const STR = {
     connectGithub: 'Connect GitHub', orLocal: 'or load from this device:',
     install: 'Install app', installIos: 'iPhone/iPad: Share ⬆ → "Add to Home Screen"',
     updateReady: 'New version ready', reload: 'Reload', version: 'Version',
-    keyboardHelp: 'Keyboard / pedal: ← → change song · PageDown/PageUp page (next song at end) · Space auto‑scroll · F stage · Ctrl+F search',
+    keyboardHelp: 'Keyboard / pedal: ← → change song · PageDown/PageUp page (next song at end) · Space auto‑scroll · F stage · L hide list · Ctrl+F search',
     clock24: '24 hours', pushConfirm: '{n} changes will be uploaded to GitHub. Continue?', chords: 'Chords',
   },
 };

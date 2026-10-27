@@ -6,7 +6,7 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '4.6.0';
+export const VERSION = '4.7.0';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -278,11 +278,11 @@ function renderList() {
       const d = parts.slice(0, i + 1).join('/');
       head.append(h('button', { class: 'crumb', onclick: () => goDir(d) }, part));
     });
-    head.append(h('span', { class: 'spacer' }),
+    head.append(...[h('span', { class: 'spacer' }),
       VIEW_ONLY ? null : h('button', { class: 'small-btn', title: t('newFolder'), onclick: newFolder }, '＋📁'),
       VIEW_ONLY ? null : h('button', { class: 'small-btn', title: t('newSong'), onclick: () => openEditor(null) }, '＋♪'),
       VIEW_ONLY || !S.dir ? null : h('button', { class: 'small-btn', title: t('renameFolder'), onclick: () => renameFolder(S.dir) }, '✎📁'),
-      VIEW_ONLY || !S.dir ? null : h('button', { class: 'small-btn danger-btn', title: t('deleteFolder'), onclick: () => deleteFolder(S.dir) }, '🗑📁'));
+      VIEW_ONLY || !S.dir ? null : h('button', { class: 'small-btn danger-btn', title: t('deleteFolder'), onclick: () => deleteFolder(S.dir) }, '🗑📁')].filter(Boolean));
     const node = S.dirs.get(S.dir) || { dirs: new Set(), files: [] };
     const dirs = [...node.dirs].sort((a, b) => S.collator.compare(baseName(a), baseName(b)));
     for (const d of dirs) {
@@ -334,7 +334,7 @@ function renderList() {
     h('span', { class: 'crumb-sep' }, '›'), h('b', { style: 'color:var(--gold)' }, prog.name), h('span', { class: 'spacer' }),
     h('button', { class: 'small-btn', title: t('rename'), onclick: () => renameProgram(prog) }, '✎'),
     h('button', { class: 'small-btn', title: t('delete'), onclick: () => deleteProgram(prog) }, '🗑'),
-    prog.items.length ? h('button', { class: 'small-btn', onclick: () => { openSong(prog.items[0], { list: prog.items, label: prog.name }); openStage(); } }, '▶ ' + t('startStage')) : null);
+    prog.items.length ? h('button', { class: 'small-btn', onclick: () => { openSong(prog.items[0], { list: prog.items, label: prog.name }); openStage(); } }, '▶ ' + t('startStage')) : '');
   const ctx = { list: prog.items, label: prog.name };
   prog.items.forEach((p, i) => {
     list.append(songItem(p, { ctx, sub: `${i + 1}. ${dirName(p)}`, acts: [
@@ -566,6 +566,7 @@ function renderSong() {
     tbBtn('⎙', t('print'), () => window.print()),
     VIEW_ONLY ? null : tbBtn('🗑', t('delete'), () => deleteSong(rec.p)),
     tbBtn('⛶', t('stage'), openStage),
+    tbBtn('▴', t('hideToolbar'), () => setCompact(true)),
   ].filter(Boolean));
   renderPhoneBar(rec, idx);
   $('songTitle').textContent = rec._title;
@@ -584,6 +585,7 @@ function renderSong() {
   document.documentElement.style.setProperty('--lyrics-size', S.settings.font + 'px');
   // sadece şarkı değişince başa dön (hız/favori değişince okunan yer kaybolmasın)
   if (S._shown !== rec.p) { $('songScroll').scrollTop = 0; S._shown = rec.p; }
+  $('unfoldBtn').hidden = !S.settings.compact || isPhone();
 }
 
 // ------------------------------------------------------------------ iPhone dikey arayüz
@@ -1293,6 +1295,44 @@ function applyLang() {
   updateSyncDot();
 }
 
+// ------------------------------------------------------------------ paneller: genişlik, gizle, liste boyu, araç çubuğu
+function applyPanels() {
+  const st = S.settings;
+  document.documentElement.style.setProperty('--side-w', (st.sideW || 340) + 'px');
+  document.documentElement.style.setProperty('--list-size', (st.listSize || 15) + 'px');
+  $('layout').classList.toggle('side-hidden', !!st.sideHidden);
+  $('btnPanel').classList.toggle('on', !st.sideHidden);
+  $('viewer').classList.toggle('compact', !!st.compact);
+  $('unfoldBtn').hidden = !st.compact || $('song').hidden;
+  $('listSize').replaceChildren(t('listSizeLabel'),
+    h('button', { class: 'small-btn', onclick: () => setListSize(-1) }, 'a−'),
+    h('span', {}, (st.listSize || 15) + ''),
+    h('button', { class: 'small-btn', onclick: () => setListSize(1) }, 'a+'),
+    h('span', { class: 'spacer', style: 'flex:1' }),
+    h('button', { class: 'small-btn', title: t('togglePanel'), onclick: () => togglePanel() }, '⇤'));
+}
+function setListSize(d) { S.settings.listSize = Math.max(11, Math.min(26, (S.settings.listSize || 15) + d)); saveSettings(); applyPanels(); }
+function togglePanel(force) { S.settings.sideHidden = force !== undefined ? force : !S.settings.sideHidden; saveSettings(); applyPanels(); }
+function setCompact(on) { S.settings.compact = on; saveSettings(); applyPanels(); }
+function bindSplitter() {
+  const sp = $('splitter');
+  let startX = 0, startW = 0, dragging = false;
+  const move = e => {
+    if (!dragging) return;
+    const x = (e.touches ? e.touches[0].clientX : e.clientX);
+    const max = Math.max(260, window.innerWidth * 0.6);
+    S.settings.sideW = Math.round(Math.max(200, Math.min(max, startW + x - startX)));
+    document.documentElement.style.setProperty('--side-w', S.settings.sideW + 'px');
+    e.preventDefault();
+  };
+  const up = () => { if (!dragging) return; dragging = false; sp.classList.remove('drag'); document.body.style.userSelect = ''; saveSettings(); };
+  const down = e => { dragging = true; startX = (e.touches ? e.touches[0].clientX : e.clientX); startW = S.settings.sideW || 340; sp.classList.add('drag'); document.body.style.userSelect = 'none'; e.preventDefault(); };
+  sp.addEventListener('mousedown', down); sp.addEventListener('touchstart', down, { passive: false });
+  window.addEventListener('mousemove', move); window.addEventListener('touchmove', move, { passive: false });
+  window.addEventListener('mouseup', up); window.addEventListener('touchend', up);
+  sp.addEventListener('dblclick', () => { S.settings.sideW = 340; saveSettings(); applyPanels(); });
+}
+
 // ------------------------------------------------------------------ saat
 function tick() {
   const d = new Date();
@@ -1314,6 +1354,9 @@ function bind() {
   });
   $('btnBack').addEventListener('click', () => { stopScroll(); setNarrowSong(false); $('editor').hidden = true; if (S.current) renderSong(); });
   $('btnSettings').addEventListener('click', openSettings);
+  $('btnPanel').addEventListener('click', () => togglePanel());
+  $('unfoldBtn').addEventListener('click', () => setCompact(false));
+  bindSplitter();
   $('btnSync').addEventListener('click', () => sync());
   $('btnLang').addEventListener('click', () => { setLang(getLang() === 'tr' ? 'en' : 'tr'); applyLang(); });
   $('modal').addEventListener('click', e => { if (e.target === $('modal')) closeModal(); });
@@ -1380,6 +1423,7 @@ function onKey(e) {
     }
     case ' ': e.preventDefault(); toggleScroll(); break;
     case 'f': case 'F': $('stage').hidden ? openStage() : closeStage(); break;
+    case 'l': case 'L': togglePanel(); break;
     case '+': case '=': setFont(2); break;
     case '-': setFont(-2); break;
   }
@@ -1429,6 +1473,7 @@ async function start() {
   rebuildIndex();
   loadUi();
   applyLang();
+  applyPanels();
   tick(); setInterval(tick, 1000);
   registerSW();
   requestPersist();
