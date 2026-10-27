@@ -1,5 +1,9 @@
 # Yol haritası
 
+## v5.2.0 — tamam (önizlemeyle onaylandı)
+- ⋯ düğmeleri kalktı: klasöre ve programa **basılı tut** → menü (klasör: Aç, Yeniden adlandır, İçine yeni klasör, Kopyala, Taşı, Sil · program: Aç, Sahneye başla, Yeniden adlandır, Kopyala, Sil); kısa dokunuş açar
+- İki parmak (pinch) sadece şarkı yazısını büyütür/küçültür, sayfa yakınlaşması kapalı; sahne modunda da
+
 ## v5.0.0 — tamam (her biri önce önizleme resmiyle onaylandı)
 - iPhone üst çubuk: büyük ‹ Geri ve dolu altın ⌂, ortada HAKANO REPERTUVAR (saat yerine; sahne modunda saat var); alt çubukta büyük ‹ ›
 - Sade bilgi satırı: sadece klasör adı (tam yol değil) + usul/makam; "Windows‑1254" kalktı; kopya bilgisi iPhone'da gizli

@@ -6,7 +6,7 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '5.0.0';
+export const VERSION = '5.2.0';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -299,8 +299,7 @@ function renderList() {
           onkeydown: e => { if (e.key === 'Enter') goDir(d); } },
         h('span', { class: 'ico' }, '📁'),
         h('span', { class: 'main' }, h('span', { class: 'name' }, baseName(d))),
-        h('span', { class: 'count' }, countIn(d)),
-        h('button', { class: 'more-btn', title: t('folderMenu'), onclick: () => openFolderSheet(d) }, '⋯'));
+        h('span', { class: 'count' }, countIn(d)));
       addLongPress(row, () => openFolderSheet(d));
       list.append(row);
     }
@@ -335,10 +334,12 @@ function renderList() {
   if (!prog) {
     head.append(h('span', { class: 'spacer' }), h('button', { class: 'small-btn', onclick: newProgram }, '＋ ' + t('newProgram')));
     for (const p of progs) {
-      list.append(h('div', { class: 'item', role: 'button', tabindex: 0, onclick: () => { S.programId = p.id; saveUi(); renderList(); } },
+      const row = h('div', { class: 'item', role: 'button', tabindex: 0, onclick: () => { S.programId = p.id; saveUi(); renderList(); } },
         h('span', { class: 'ico' }, '☰'),
         h('span', { class: 'main' }, h('span', { class: 'name' }, p.name)),
-        h('span', { class: 'count' }, p.items.length)));
+        h('span', { class: 'count' }, p.items.length));
+      addLongPress(row, () => openProgramSheet(p));   // basılı tut → program menüsü
+      list.append(row);
     }
     if (!progs.length) list.append(h('div', { class: 'list-note' }, t('emptyProgram')));
     return;
@@ -396,6 +397,7 @@ function openFolderSheet(d) {
   modal(h('div', { class: 'sheet-grab' }),
     h('div', { class: 'sheet-title' }, '📁 ' + baseName(d) + '  ·  ' + t('songs', { n })),
     h('div', { class: 'sheet-grid folder-acts' },
+      act('📂', t('open'), () => goDir(d)),
       act('✎', t('rename'), () => renameFolder(d)),
       act('＋📁', t('newFolderInside'), () => newFolder(d)),
       act('⧉', t('copy'), () => copyFolder(d)),
@@ -404,6 +406,25 @@ function openFolderSheet(d) {
     h('button', { class: 'btn sheet-close', onclick: closeModal }, t('close')));
   $('modal').classList.add('sheet');
 }
+/** Program menüsü (basılı tut): aç, sahneye başla, yeniden adlandır, kopyala, sil */
+function openProgramSheet(pr) {
+  const act = (icon, label, fn, cls = '') => h('button', { class: 'sheet-act ' + cls, onclick: () => { closeModal(); fn(); } },
+    h('span', { class: 'sheet-ico' }, icon), h('span', {}, label));
+  modal(h('div', { class: 'sheet-grab' }),
+    h('div', { class: 'sheet-title' }, '☰ ' + pr.name + '  ·  ' + t('songs', { n: pr.items.length })),
+    h('div', { class: 'sheet-grid folder-acts' },
+      act('📂', t('open'), () => { S.programId = pr.id; saveUi(); renderList(); }),
+      pr.items.length ? act('▶', t('startStage'), () => { openSong(pr.items[0], { list: pr.items, label: pr.name }); openStage(); }) : null,
+      act('✎', t('rename'), () => renameProgram(pr)),
+      act('⧉', t('copy'), () => {
+        const cp = { id: uid(), name: pr.name + ' (' + t('copyWord') + ')', items: [...pr.items], updated: Date.now() };
+        S.programs.programs.push(cp); savePrograms(); renderList(); toast(t('saved'));
+      }),
+      act('🗑', t('delete'), () => deleteProgram(pr), 'danger')),
+    h('button', { class: 'btn sheet-close', onclick: closeModal }, t('close')));
+  $('modal').classList.add('sheet');
+}
+
 function addLongPress(el, fn) {
   let timer = 0, moved = false;
   el.addEventListener('touchstart', () => { moved = false; timer = setTimeout(() => { if (!moved) { el.dataset.lp = '1'; fn(); } }, 550); }, { passive: true });
@@ -762,6 +783,24 @@ function setFont(d) {
     document.documentElement.style.setProperty('--lyrics-size', S.settings.font + 'px');
   }
   saveSettings();
+}
+/** İki parmakla (pinch) sadece şarkı yazısını büyüt/küçült; ekran düzeni sabit kalır. */
+function addPinchFont(el) {
+  let d0 = 0, f0 = 0, stage = false;
+  const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  el.addEventListener('touchstart', e => {
+    if (e.touches.length !== 2) return;
+    stage = !$('stage').hidden;
+    d0 = dist(e.touches); f0 = stage ? S.settings.stageFont : S.settings.font;
+  }, { passive: true });
+  el.addEventListener('touchmove', e => {
+    if (e.touches.length !== 2 || !d0) return;
+    e.preventDefault();
+    const f = Math.round(f0 * dist(e.touches) / d0);
+    if (stage) { S.settings.stageFont = Math.max(18, Math.min(90, f)); document.documentElement.style.setProperty('--stage-size', S.settings.stageFont + 'px'); }
+    else { S.settings.font = Math.max(12, Math.min(60, f)); document.documentElement.style.setProperty('--lyrics-size', S.settings.font + 'px'); }
+  }, { passive: false });
+  el.addEventListener('touchend', e => { if (d0 && e.touches.length < 2) { d0 = 0; saveSettings(); } });
 }
 function setSpeed(d) { S.settings.speed = Math.max(5, Math.min(200, S.settings.speed + d)); saveSettings(); renderSong(); }
 
@@ -1547,7 +1586,9 @@ function bind() {
   $('stageSmaller').addEventListener('click', () => setFont(-1));
   $('stageBigger').addEventListener('click', () => setFont(1));
   $('stageScrollBtn').addEventListener('click', toggleScroll);
-  for (const el of [$('songScroll'), $('stageScroll')]) addSwipe(el);
+  for (const el of [$('songScroll'), $('stageScroll')]) { addSwipe(el); addPinchFont(el); }
+  // sayfa (ekran) yakınlaştırmasını kapat: iki parmak sadece şarkı yazısını büyütür
+  for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, e => e.preventDefault(), { passive: false });
 
   document.addEventListener('keydown', onKey);
   window.addEventListener('online', () => scheduleSync());

@@ -1,4 +1,4 @@
-// iPhone klasör menüsü testi (v5.0): ⋯ → taşı / kopyala / yeniden adlandır (Git Data API taklit).
+// iPhone klasör menüsü testi (v5.1): basılı tut (contextmenu) → taşı / kopyala / yeniden adlandır (Git Data API taklit).
 const { chromium, devices } = require('playwright');
 const fs = require('fs'); const crypto = require('crypto');
 const BUNDLE = fs.readFileSync(process.env.BUNDLE || '../Muzik-Defteri-Repertuar/bundle/repertuar.json.gz');
@@ -25,7 +25,7 @@ const trees = [], commits = [];
   await page.waitForFunction(() => window.__md.songs.size > 5000 && !window.__md.sync.busy, null, { timeout: 60000 }); await page.waitForTimeout(2600);
   await page.locator('.item', { hasText: '1.Oyun Havalari' }).first().click();
   await page.screenshot({ path: (process.env.OUT || '/tmp') + '/fm1.png' });
-  await page.locator('.item', { hasText: 'KINA' }).first().locator('.more-btn').click(); await page.waitForTimeout(250);
+  await page.locator('.item', { hasText: 'KINA' }).first().dispatchEvent('contextmenu'); await page.waitForTimeout(250);
   await page.screenshot({ path: (process.env.OUT || '/tmp') + '/fm2.png' });
   await page.click('.sheet-act:has-text("Taşı")'); await page.waitForTimeout(250);
   await page.fill('.modal-card input', 'halay'); await page.waitForTimeout(150);
@@ -33,11 +33,11 @@ const trees = [], commits = [];
   await page.locator('.folder-pick .item', { hasText: 'Halay' }).first().click(); await page.waitForTimeout(1200);
   console.log('taşı ->', await page.evaluate(() => window.__md.dir), commits);
   await page.click('.nav-pill:has-text("Üst klasör")');
-  await page.locator('.item', { hasText: 'KINA' }).first().locator('.more-btn').click();
+  await page.locator('.item', { hasText: 'KINA' }).first().dispatchEvent('contextmenu');
   await page.click('.sheet-act:has-text("Kopyala")'); await page.locator('.folder-pick .item').first().click(); await page.waitForTimeout(1200);
   console.log('kopyala ->', await page.evaluate(() => window.__md.dir), commits.slice(-1), 'ağaç girdisi', trees[trees.length-1].tree.length, 'silme', trees[trees.length-1].tree.filter(e=>e.sha===null).length);
   await page.click('.nav-pill:has-text("Üst klasör")').catch(() => {});
-  await page.locator('.item', { hasText: 'KINA (kopya)' }).first().locator('.more-btn').click();
+  await page.locator('.item', { hasText: 'KINA (kopya)' }).first().dispatchEvent('contextmenu');
   await page.click('.sheet-act:has-text("Yeniden adlandır")'); await page.fill('.modal-card input', 'Kına Havaları'); await page.click('.modal-card >> text=OK'); await page.waitForTimeout(1200);
   console.log('ad ->', await page.evaluate(() => window.__md.dir), commits.slice(-1));
   console.log('ERR', errors); await b.close();
