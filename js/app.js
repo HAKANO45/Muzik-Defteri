@@ -6,7 +6,7 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '5.4.0';
+export const VERSION = '5.5.0';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -838,6 +838,91 @@ function openSong(p, ctx) {
   for (const el of $('list').querySelectorAll('.item')) el.classList.toggle('active', el.dataset.p === p);
   if (!$('stage').hidden) renderStage();
   keepAwake();
+  linkSend(p);
+}
+
+// ------------------------------------------------------------------ 🔗 Ortak Sahne
+// İki cihaz aynı odaya bağlanır; biri şarkı açınca ötekinde de açılır. Sadece şarkının yolu gider (söz gitmez).
+// Aracı: ntfy.sh (ücretsiz, hesapsız). Oda kodu = şifre; repertuvar deposunda sahne.json'da durur.
+const LINK_KEY = 'md.link';
+const DEV_ID = (() => { try { let x = localStorage.getItem('md.devId'); if (!x) { x = Math.random().toString(36).slice(2, 10); localStorage.setItem('md.devId', x); } return x; } catch (_) { return Math.random().toString(36).slice(2, 10); } })();
+const L = { on: false, code: '', name: '', mode: 'both', es: null, state: 'off', applying: false, sendT: 0, lastSent: '' };
+try { Object.assign(L, JSON.parse(localStorage.getItem(LINK_KEY) || '{}')); } catch (_) {}
+function linkSave() { try { localStorage.setItem(LINK_KEY, JSON.stringify({ on: L.on, code: L.code, name: L.name, mode: L.mode })); } catch (_) {} }
+function linkTopic() { return 'hakano-sahne-' + L.code.toLowerCase().replace(/[^a-z0-9]/g, ''); }
+function newRoomCode() { const a = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let x = ''; const r = crypto.getRandomValues(new Uint8Array(12)); for (const b of r) x += a[b % a.length]; return x; }
+function linkUi() {
+  const b = $('btnLink'); if (!b) return;
+  b.classList.toggle('on', L.on && L.state === 'ok');
+  b.classList.toggle('warn', L.on && L.state !== 'ok');
+  b.title = t('linkTitle') + (L.on ? ' — ' + t(L.state === 'ok' ? 'linkOn' : 'linkWait') : '');
+  const sl = $('stageLink'); if (sl) { sl.hidden = !L.on; sl.className = 'stage-link ' + (L.state === 'ok' ? 'ok' : 'warn'); }
+}
+function linkConnect() {
+  if (L.es) { L.es.close(); L.es = null; }
+  if (!L.on || !L.code) { L.state = 'off'; linkUi(); return; }
+  L.state = 'wait'; linkUi();
+  const es = new EventSource('https://ntfy.sh/' + linkTopic() + '/sse');
+  L.es = es;
+  es.onopen = () => { L.state = 'ok'; linkUi(); };
+  es.onerror = () => { L.state = 'wait'; linkUi(); };   // EventSource kendisi yeniden bağlanır
+  es.onmessage = ev => {
+    let m; try { m = JSON.parse(JSON.parse(ev.data).message); } catch (_) { return; }
+    L.state = 'ok'; linkUi();
+    if (!m || m.id === DEV_ID || L.mode === 'lead' || !m.p) return;
+    if (Date.now() - (m.t || 0) > 120000) return;          // eski mesaj
+    const rec = S.songs.get(m.p);
+    if (!rec || rec.del) { toast('🔗 ' + (m.by || '') + ': ' + t('linkMissing')); return; }
+    if (S.current === m.p) return;
+    if (!$('editor').hidden) { toast('🔗 ' + (m.by || '') + ': ' + rec._title); return; }   // düzenleme bozulmasın
+    L.applying = true;
+    try { openSong(m.p, S.context.list.includes(m.p) ? null : { list: [m.p], label: '🔗 ' + (m.by || '') }); }
+    finally { L.applying = false; }
+    toast('🔗 ' + (m.by ? m.by + ': ' : '') + rec._title);
+  };
+}
+function linkSend(p) {
+  if (!L.on || !L.code || L.applying || L.mode === 'follow') return;
+  clearTimeout(L.sendT);
+  L.sendT = setTimeout(() => {                             // hızlı ileri-geride sadece sonuncusu gider
+    if (L.lastSent === p + S.current && S.current !== p) return;
+    const body = JSON.stringify({ p, by: L.name || '', id: DEV_ID, t: Date.now() });
+    fetch('https://ntfy.sh/' + linkTopic(), { method: 'POST', body }).then(r => { if (!r.ok) throw new Error(r.status); L.state = 'ok'; linkUi(); })
+      .catch(() => { L.state = 'wait'; linkUi(); toast(t('linkSendFail')); });
+  }, 350);
+}
+async function linkRoomFromRepo() {
+  const g = gh(); if (!g.ok || !navigator.onLine) return '';
+  try {
+    const { data, sha } = await g.getJson('sahne.json');
+    if (data && data.oda) return data.oda;
+    const oda = newRoomCode();
+    try { await g.putFile('sahne.json', new TextEncoder().encode(JSON.stringify({ oda }, null, 1)), 'Ortak Sahne oda kodu', sha || undefined); }
+    catch (_) { const again = await g.getJson('sahne.json'); return (again.data && again.data.oda) || ''; }   // öteki cihaz aynı anda oluşturduysa onunkini al
+    return oda;
+  } catch (_) { return ''; }
+}
+async function openLinkSheet() {
+  if (!L.code) L.code = await linkRoomFromRepo() || '';
+  const nameIn = h('input', { class: 'field', value: L.name, placeholder: 'Hakan, Eylem…', autocapitalize: 'words' });
+  const codeIn = h('input', { class: 'field link-code', value: L.code, autocapitalize: 'characters', spellcheck: 'false' });
+  const modes = [['both', '⇄ ' + t('linkBoth')], ['follow', '⇠ ' + t('linkFollow')], ['lead', '⇢ ' + t('linkLead')]];
+  const seg = h('div', { class: 'seg link-seg' }, ...modes.map(([k, l]) => h('button', { class: 'seg-btn' + (L.mode === k ? ' on' : ''), onclick: e => {
+    L.mode = k; seg.querySelectorAll('.seg-btn').forEach(x => x.classList.toggle('on', x === e.currentTarget)); } }, l)));
+  const apply = on => {
+    L.name = nameIn.value.trim(); L.code = codeIn.value.trim().toUpperCase(); L.on = on && !!L.code;
+    linkSave(); linkConnect(); closeModal(); toast(L.on ? '🔗 ' + t('linkOnToast') : t('linkOffToast'));
+  };
+  modal(
+    h('div', { class: 'modal-head' }, h('h2', {}, '🔗 ' + t('linkTitle')), h('button', { class: 'mh-btn', onclick: closeModal }, '✕')),
+    h('p', { class: 'link-help' }, t('linkHelp')),
+    h('button', { class: 'btn link-big ' + (L.on ? 'off' : 'primary'), onclick: () => apply(!L.on) }, L.on ? '⏹ ' + t('linkStop') : '🔗 ' + t('linkStart')),
+    h('label', { class: 'lab' }, t('linkName')), nameIn,
+    h('label', { class: 'lab' }, t('linkMode')), seg,
+    h('label', { class: 'lab' }, t('linkCode')), codeIn,
+    h('div', { class: 'link-small' }, t('linkCodeHelp')),
+    L.on ? h('button', { class: 'btn', style: 'margin-top:10px', onclick: () => apply(true) }, t('save')) : null,
+  );
 }
 
 function lyricsHtml(text) {
@@ -1772,6 +1857,8 @@ function bind() {
   $('btnHome').addEventListener('click', goHome);
   $('btnBack').addEventListener('click', () => { stopScroll(); setNarrowSong(false); $('editor').hidden = true; if (S.current) renderSong(); });
   $('btnSettings').addEventListener('click', openSettings);
+  $('btnLink').addEventListener('click', openLinkSheet);
+  linkConnect();
   $('btnPanel').addEventListener('click', () => togglePanel());
   $('unfoldBtn').addEventListener('click', () => setCompact(false));
   bindSplitter();
