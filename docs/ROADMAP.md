@@ -1,5 +1,10 @@
 # Yol haritası
 
+## v5.9.0 — tamam (önizlemeyle onaylandı)
+- 🔤 Düzelt: düzenleme ekranında Türkçe harf önerileri (✓/✕), BÜYÜK→normal yazı, fazla boş satır, dosya adı; klasör menüsünde toplu "Türkçe harf düzelt" (liste → onay → tek commit, kodlama korunur, yollar remap). Sözlük `bundle/sozluk.json.gz` (data deposu `tools/build_sozluk.py`, Action üretir; ≥3 geçiş, %90 baskın, tümü büyük harf kelimeler sayılmaz). `js/turkce.js`.
+- commitBatch: yeni blob'lar 6'şar paralel.
+- Sırada: 📄 PDF/Word içe aktar (pdf.js, .docx), 🧹 Kopya tarama, ayarlar a–f.
+
 ## v5.8.0 — tamam (önizlemeyle onaylandı)
 - Görünüm → Yazım: klasör adları / şarkı adları / sözler için Olduğu gibi · BÜYÜK HARF · Baş Harfler Büyük (sözlerde Normal yazı). Sadece görünüş (`caseText`, `showTitle`, `showFolder`), Türkçe kural, gorunum.json ile senkron.
 - Sırada: 🔤 Düzelt, 🧹 Kopya tarama, ayarlar a–f (çöp kutusu, yedek ZIP, açılış, pedal, kopya uyarısı, okunaklı yazı), GitHub Desktop yardımı.

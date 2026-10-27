@@ -54,6 +54,8 @@ Ortak Sahne (`openLinkSheet`, `linkConnect`, `linkSend`, durum `L`): ntfy.sh kon
 
 Kütüphane listesi ağaçtır (`renderTree`, `toggleDir`, `openDirs`): tek dokunuş klasörü yerinde açar; Sırala/Seç modları sadece `S.dir` düz listesi. Testlerde klasöre girmek: `page.evaluate(() => window.__mdGo('KINA'))`.
 
+🔤 Düzelt: `js/turkce.js` (Python `tools/turkce_harf.py` ile aynı kurallar); sözlük senkronda `refreshLexicon` ile `db 'sozluk'`a iner. Toplu düzeltme `fixFolder` → `commitFolderChange` (bytes destekli). Test: `tools/e2e-fix.js`.
+
 Sıralama: `siralama.json` → klasör başına ad listesi (`orderedChildren`, `moveItem`); sırası olmayanlar alfabetik sona. Liste satırlarında tek dokunuş = aç, çift dokunuş = menü (`addTaps`), basılı tut = menü (`addLongPress`). Çoklu seçim: `S.sel`, `filesCopyMove`, `filesDelete`, `renameSong` (iPhone'da da açık — dosya yönetimi).
 
 Şarkı notları: `notlar.json` → `{ notes: { <yol>: { solist, bpm, ton, style, not, updated, deleted? } } }` — yol başına `updated` ile birleştirilir. Şarkı yeniden adlandırılınca/taşınınca not da taşınır (`replacePathEverywhere`). Toplu taşımada (repertuvar düzenleme) `notlar.json` ve `programlar.json` yolları da güncellenmeli.
