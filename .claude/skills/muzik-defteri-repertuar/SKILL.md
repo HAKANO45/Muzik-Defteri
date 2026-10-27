@@ -19,13 +19,15 @@ legacy/               eski VB6 programı (sadece referans)
 .github/workflows/bundle.yml  repertuar/** değişince paketi yeniden üretir
 ```
 
-## Klasör ve ad kuralları (mevcut düzen — bozma)
-- Üst klasörler: `Türküler`, `1.Oyun Havalari`, `2.Slov Fantazi Tsm`, `Halay`, `KINA`, `Ciftetelli`, `9-8 Roman`, `Yeni`, … Yeni dosyayı en uygun mevcut klasöre koy; emin değilsen kullanıcıya sor.
-- Usul dosya veya klasör adının başında: `5-8 SARI GELIN.TXT`, `9-8/…`. Uygulama bunu `5/8` etiketine çevirir (`textutil.js → tagsOf`).
-- Makam klasörleri: `01.Ussak`, `02.Kürdi`, `03.Hicaz`, `04.Nihavent`, `Rast`… → `Uşşak`, `Kürdi` etiketleri.
-- Sanatçı klasörleri: `Türküler/Neset Ertas`, `2.Slov Fantazi Tsm/Orhan Gencebay` …
-- Baştaki sıra numarası (`01.`, `3.`) görünen başlıktan atılır; sıralama için kullanılabilir.
-- Dosya adı = şarkı adı. Windows'ta yasak karakterler `\ / : * ? " < > |` kullanılmaz.
+## Klasör yapısı (27.10.2026 temiz defter — bozma)
+- `Sanatçılar/<Sanatçı>/` — sanatçısı bilinen şarkılar. Ad doğru Türkçe yazımla (Müslüm Gürses, İbrahim Tatlıses).
+- Tür klasörleri: `Oyun Havaları/<Halay|Roman|Kasap|Oryantal - Çiftetelli|Ankara|Zeybek - Ege|Rumeli|Kına|Karışık>`, `Türk Halk Müziği/[Uşşak|Kürdi|Hicaz|Nihavent|5-8|…|Uzun Hava]`, `Türk Sanat Müziği`, `Pop`, `Slow`, `Karadeniz`, `Nostalji`, `Vals`, `Azeri`, `Fantezi`, `Dans`, `Şiir`.
+- `Karışık (türü belirsiz)/` — sanatçısı/türü henüz bilinmeyenler; araştırıldıkça Sanatçılar'a veya tür klasörüne taşınır.
+- `Diğer dosyalar (doc, pptx)/` — uygulamada görünmez.
+- Eski set klasörleri (Sahne 112, Ceza Evi Program…) artık klasör değil, `programlar.json` içinde program.
+- Kopya yok: yeni şarkı eklemeden önce aynı metin var mı kontrol et (tools/kopya_raporu.py).
+- Dosya adı = şarkı adı (sanatçı adı dosya adına yazılmaz, klasörden gelir). Windows'ta yasak karakterler `\ / : * ? " < > |` kullanılmaz.
+- Düzenleme öncesi tam arşiv: `eski-arsiv-2026-10-27` dalında. Düzenleme aracı: `tools/duzenle.py`, taşıma listesi: `rapor/duzenleme_tasima.csv`.
 
 ## Taşıma / silme kuralı
 Bir şarkı dosyası taşınır, yeniden adlandırılır veya kopyası silinirse `programlar.json` (items + fav) ve `notlar.json` içindeki eski yollar **aynı commit'te** yeni/kalan yola çevrilir. Hiçbir program şarkı, hiçbir not sahibini kaybetmez.
