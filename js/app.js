@@ -6,7 +6,7 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '5.5.1';
+export const VERSION = '5.6.0';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -528,34 +528,50 @@ function renderList() {
   }
 
   // programlar
-  const progs = S.programs.programs.filter(p => !p.deleted);
+  const progs = orderedPrograms();
   const prog = progs.find(p => p.id === S.programId);
+  const doneBar = () => h('div', { class: 'edit-bar' }, h('span', { class: 'edit-title' }, '↕ ' + t('sortHint')),
+    h('button', { class: 'nav-pill', onclick: () => { S.sortMode = false; renderList(); } }, '✓ ' + t('done')));
   if (!prog) {
-    head.append(h('span', { class: 'spacer' }), h('button', { class: 'small-btn', onclick: newProgram }, '＋ ' + t('newProgram')));
-    for (const p of progs) {
-      const row = h('div', { class: 'item', role: 'button', tabindex: 0 },
+    if (S.sortMode) head.append(doneBar());
+    else head.append(h('span', { class: 'spacer' }),
+      progs.length > 1 ? h('button', { class: 'small-btn', title: t('sortTitle'), onclick: () => { S.sortMode = true; renderList(); } }, '↕') : '',
+      h('button', { class: 'small-btn', onclick: newProgram }, '＋ ' + t('newProgram')));
+    progs.forEach((p, i) => {
+      const row = h('div', { class: 'item' + (S.sortMode ? ' sorting' : ''), role: 'button', tabindex: 0 },
         h('span', { class: 'ico' }, '☰'),
         h('span', { class: 'main' }, h('span', { class: 'name' }, p.name)),
-        h('span', { class: 'count' }, p.items.length));
-      addTaps(row, () => { S.programId = p.id; saveUi(); renderList(); }, () => openProgramSheet(p));   // çift dokunuş → menü
-      addLongPress(row, () => openProgramSheet(p));   // basılı tut → program menüsü
+        S.sortMode ? h('span', { class: 'acts sort-acts' },
+          h('button', { class: 'sort-btn', onclick: e => { e.stopPropagation(); moveProgram(progs, i, -1); } }, '▲'),
+          h('button', { class: 'sort-btn', onclick: e => { e.stopPropagation(); moveProgram(progs, i, 1); } }, '▼'))
+          : h('span', { class: 'count' }, p.items.length));
+      if (!S.sortMode) {
+        addTaps(row, () => { S.programId = p.id; saveUi(); renderList(); }, () => openProgramSheet(p));   // çift dokunuş → menü
+        addLongPress(row, () => openProgramSheet(p));   // basılı tut → program menüsü
+      }
       list.append(row);
-    }
+    });
     if (!progs.length) list.append(h('div', { class: 'list-note' }, t('emptyProgram')));
     return;
   }
-  head.append(h('button', { class: 'crumb', onclick: () => { S.programId = null; saveUi(); renderList(); } }, '‹ ' + t('programs')),
-    h('span', { class: 'crumb-sep' }, '›'), h('b', { style: 'color:var(--gold)' }, prog.name), h('span', { class: 'spacer' }),
+  head.append(h('button', { class: 'crumb', onclick: () => { S.programId = null; S.sortMode = false; saveUi(); renderList(); } }, '‹ ' + t('programs')),
+    h('span', { class: 'crumb-sep' }, '›'), h('b', { style: 'color:var(--gold)' }, prog.name), h('span', { class: 'spacer' }));
+  if (S.sortMode) head.append(doneBar());
+  else head.append(
+    prog.items.length > 1 ? h('button', { class: 'small-btn', title: t('sortTitle'), onclick: () => { S.sortMode = true; renderList(); } }, '↕') : '',
     h('button', { class: 'small-btn', title: t('rename'), onclick: () => renameProgram(prog) }, '✎'),
     h('button', { class: 'small-btn', title: t('delete'), onclick: () => deleteProgram(prog) }, '🗑'),
     prog.items.length ? h('button', { class: 'small-btn', onclick: () => { openSong(prog.items[0], { list: prog.items, label: prog.name }); openStage(); } }, '▶ ' + t('startStage')) : '');
   const ctx = { list: prog.items, label: prog.name };
   prog.items.forEach((p, i) => {
-    list.append(songItem(p, { ctx, sub: `${i + 1}. ${dirName(p)}`, acts: [
-      h('button', { title: t('moveUp'), onclick: () => moveInProgram(prog, i, -1) }, '▲'),
-      h('button', { title: t('moveDown'), onclick: () => moveInProgram(prog, i, 1) }, '▼'),
-      h('button', { title: t('remove'), onclick: () => { prog.items.splice(i, 1); touchProgram(prog); } }, '✕'),
-    ] }));
+    if (S.sortMode) {
+      const it = songItem(p, { ctx, sub: `${i + 1}. ${dirName(p)}`, acts: [
+        h('button', { class: 'sort-btn', title: t('moveUp'), onclick: e => { e.stopPropagation(); moveInProgram(prog, i, -1); } }, '▲'),
+        h('button', { class: 'sort-btn', title: t('moveDown'), onclick: e => { e.stopPropagation(); moveInProgram(prog, i, 1); } }, '▼'),
+        h('button', { class: 'sort-btn danger', title: t('remove'), onclick: e => { e.stopPropagation(); prog.items.splice(i, 1); touchProgram(prog); } }, '✕'),
+      ] });
+      it.classList.add('sorting'); it.onclick = null; list.append(it);
+    } else list.append(songItem(p, { ctx, sub: `${i + 1}. ${dirName(p)}` }));
   });
   if (!prog.items.length) list.append(h('div', { class: 'list-note' }, t('emptyProgram')));
 }
@@ -1357,6 +1373,17 @@ async function deleteProgram(pr) {
   pr.deleted = true; pr.items = []; pr.updated = Date.now();
   S.programId = null; savePrograms(); renderList();
 }
+/** Programların kendi sırası (programlar.json → order, tüm cihazlarda aynı). */
+function orderedPrograms() {
+  const progs = S.programs.programs.filter(p => !p.deleted);
+  const pos = new Map((S.programs.order || []).map((id, i) => [id, i]));
+  return progs.map((p, i) => [p, pos.has(p.id) ? pos.get(p.id) : 1e6 + i]).sort((a, b) => a[1] - b[1]).map(x => x[0]);
+}
+function moveProgram(progs, i, d) {
+  const j = i + d; if (j < 0 || j >= progs.length) return;
+  const ids = progs.map(p => p.id); [ids[i], ids[j]] = [ids[j], ids[i]];
+  S.programs.order = ids; S.programs.orderUpdated = Date.now(); savePrograms(); renderList();
+}
 function moveInProgram(pr, i, d) {
   const j = i + d; if (j < 0 || j >= pr.items.length) return;
   [pr.items[i], pr.items[j]] = [pr.items[j], pr.items[i]];
@@ -1383,7 +1410,9 @@ function mergePrograms(local, remote) {
   for (const p of remote.programs || []) byId.set(p.id, p);
   for (const p of local.programs) { const r = byId.get(p.id); if (!r || (p.updated || 0) > (r.updated || 0)) byId.set(p.id, p); }
   const fav = (local.favUpdated || 0) >= (remote.favUpdated || 0) ? local.fav : (remote.fav || []);
-  return { format: 1, programs: [...byId.values()], fav, favUpdated: Math.max(local.favUpdated || 0, remote.favUpdated || 0) };
+  const order = (local.orderUpdated || 0) >= (remote.orderUpdated || 0) ? (local.order || []) : (remote.order || []);
+  return { format: 1, programs: [...byId.values()], fav, favUpdated: Math.max(local.favUpdated || 0, remote.favUpdated || 0),
+    order, orderUpdated: Math.max(local.orderUpdated || 0, remote.orderUpdated || 0) };
 }
 
 // ------------------------------------------------------------------ senkronizasyon
@@ -1501,7 +1530,7 @@ async function sync({ quiet = false } = {}) {
     else if ($('editor').hidden) renderEmpty();
   }
 }
-function stripPrograms(p) { return { format: 1, programs: p.programs || [], fav: p.fav || [], favUpdated: p.favUpdated || 0 }; }
+function stripPrograms(p) { return { format: 1, programs: p.programs || [], fav: p.fav || [], favUpdated: p.favUpdated || 0, order: p.order || [], orderUpdated: p.orderUpdated || 0 }; }
 
 /** Paket ile yerel veriyi birleştir. Kural: gönderilmemiş yerel değişiklik her zaman korunur. */
 async function mergeBundle(bundle) {
@@ -1850,7 +1879,7 @@ function bind() {
   $('qText').addEventListener('change', () => { S.settings.searchText = $('qText').checked; saveSettings(); renderList(); });
   $('tabs').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
-    S.tab = b.dataset.tab; $('q').value = ''; S.limit = 300;
+    S.tab = b.dataset.tab; S.sortMode = false; S.sel = null; $('q').value = ''; S.limit = 300;
     if (S.tab !== 'programs') S.programId = null;
     saveUi(); renderList(); $('list').scrollTop = 0;
   });

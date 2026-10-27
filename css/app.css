@@ -439,3 +439,5 @@ input, textarea, select { font: inherit; color: var(--text); }
   .phone-title { letter-spacing: .03em; font-size: clamp(10px, 3.4vw, 14px); }
   #btnLink { min-width: calc(44px * var(--ui)); }
 }
+
+.sort-btn.danger, .item .acts .sort-btn.danger { border-color: var(--danger) !important; color: var(--danger) !important; }
