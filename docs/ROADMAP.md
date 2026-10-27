@@ -1,5 +1,8 @@
 # Yol haritası
 
+## v4.7.1 — tamam
+- Taşınmış/silinmiş şarkının eski notu senkronda geri yüklenmiyor
+
 ## v4.7.0 — tamam
 - Okuma alanı: liste ile şarkı arasındaki çizgi sürüklenerek genişlik ayarlanır (çift tık = sıfırla)
 - ☰ / L tuşu: listeyi gizle → şarkı tam genişlik

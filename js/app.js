@@ -6,7 +6,7 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '4.7.0';
+export const VERSION = '4.7.1';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -231,7 +231,11 @@ function openNoteDialog(p) {
 
 function mergeNotes(local, remote) {
   const out = { ...(remote && remote.notes || {}) };
-  for (const [p, n] of Object.entries(local.notes || {})) if (!out[p] || (n.updated || 0) > (out[p].updated || 0)) out[p] = n;
+  for (const [p, n] of Object.entries(local.notes || {})) {
+    // depoda artık olmayan şarkının (taşınmış/silinmiş) eski notunu geri yükleme
+    if (!out[p] && !n.deleted && S.songs.size && !S.songs.has(p)) continue;
+    if (!out[p] || (n.updated || 0) > (out[p].updated || 0)) out[p] = n;
+  }
   return { format: 1, notes: out };
 }
 
