@@ -6,7 +6,7 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 
-export const VERSION = '4.8.0';
+export const VERSION = '5.0.0';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -287,17 +287,22 @@ function renderList() {
       head.append(h('button', { class: 'crumb', onclick: () => goDir(d) }, part));
     });
     head.append(...[h('span', { class: 'spacer' }),
-      VIEW_ONLY ? null : h('button', { class: 'small-btn', title: t('newFolder'), onclick: newFolder }, '＋📁'),
+      h('button', { class: 'small-btn', title: t('newFolder'), onclick: () => newFolder() }, '＋📁'),
       VIEW_ONLY ? null : h('button', { class: 'small-btn', title: t('newSong'), onclick: () => openEditor(null) }, '＋♪'),
       VIEW_ONLY || !S.dir ? null : h('button', { class: 'small-btn', title: t('renameFolder'), onclick: () => renameFolder(S.dir) }, '✎📁'),
       VIEW_ONLY || !S.dir ? null : h('button', { class: 'small-btn danger-btn', title: t('deleteFolder'), onclick: () => deleteFolder(S.dir) }, '🗑📁')].filter(Boolean));
     const node = S.dirs.get(S.dir) || { dirs: new Set(), files: [] };
     const dirs = [...node.dirs].sort((a, b) => S.collator.compare(baseName(a), baseName(b)));
     for (const d of dirs) {
-      list.append(h('div', { class: 'item', role: 'button', tabindex: 0, onclick: () => goDir(d), onkeydown: e => { if (e.key === 'Enter') goDir(d); } },
+      const row = h('div', { class: 'item', role: 'button', tabindex: 0,
+          onclick: e => { if (e.target.closest('.more-btn')) return; goDir(d); },
+          onkeydown: e => { if (e.key === 'Enter') goDir(d); } },
         h('span', { class: 'ico' }, '📁'),
         h('span', { class: 'main' }, h('span', { class: 'name' }, baseName(d))),
-        h('span', { class: 'count' }, countIn(d))));
+        h('span', { class: 'count' }, countIn(d)),
+        h('button', { class: 'more-btn', title: t('folderMenu'), onclick: () => openFolderSheet(d) }, '⋯'));
+      addLongPress(row, () => openFolderSheet(d));
+      list.append(row);
     }
     const ctx = { list: node.files, label: S.dir || t('root') };
     for (const p of node.files.slice(0, S.limit)) list.append(songItem(p, { ctx, sub: '' }));
@@ -383,13 +388,37 @@ function loadUi() {
 /** Boş (henüz şarkısı olmayan) klasörler IndexedDB'de saklanır; yoksa uygulama kapanınca kaybolur. */
 function saveVirtualDirs() { return db.set('virtualDirs', [...S.virtualDirs]); }
 
-async function newFolder() {
-  if (VIEW_ONLY) { toast(t('viewOnly')); return; }
+/** Klasör menüsü (⋯ veya uzun bas): adını değiştir, içine yeni klasör, sil. iPhone'da da çalışır. */
+function openFolderSheet(d) {
+  const n = countIn(d);
+  const act = (icon, label, fn, cls = '') => h('button', { class: 'sheet-act ' + cls, onclick: () => { closeModal(); fn(); } },
+    h('span', { class: 'sheet-ico' }, icon), h('span', {}, label));
+  modal(h('div', { class: 'sheet-grab' }),
+    h('div', { class: 'sheet-title' }, '📁 ' + baseName(d) + '  ·  ' + t('songs', { n })),
+    h('div', { class: 'sheet-grid folder-acts' },
+      act('✎', t('rename'), () => renameFolder(d)),
+      act('＋📁', t('newFolderInside'), () => newFolder(d)),
+      act('⧉', t('copy'), () => copyFolder(d)),
+      act('➜', t('move'), () => moveFolder(d)),
+      act('🗑', t('delete'), () => deleteFolder(d), 'danger')),
+    h('button', { class: 'btn sheet-close', onclick: closeModal }, t('close')));
+  $('modal').classList.add('sheet');
+}
+function addLongPress(el, fn) {
+  let timer = 0, moved = false;
+  el.addEventListener('touchstart', () => { moved = false; timer = setTimeout(() => { if (!moved) { el.dataset.lp = '1'; fn(); } }, 550); }, { passive: true });
+  el.addEventListener('touchmove', () => { moved = true; clearTimeout(timer); }, { passive: true });
+  el.addEventListener('touchend', e => { clearTimeout(timer); if (el.dataset.lp) { delete el.dataset.lp; e.preventDefault(); } });
+  el.addEventListener('contextmenu', e => { e.preventDefault(); fn(); });
+}
+
+async function newFolder(parent) {
+  const base = typeof parent === 'string' ? parent : S.dir;
   const name = await promptText(t('newFolder'), '');
   if (!name) return;
   const clean = name.replace(/[\\/:*?"<>|]/g, '').trim();
   if (!clean) return;
-  const d = S.dir ? S.dir + '/' + clean : clean;
+  const d = base ? base + '/' + clean : clean;
   S.virtualDirs.add(d);
   await saveVirtualDirs();
   rebuildIndex();
@@ -458,13 +487,64 @@ async function commitFolderChange(songs, changes, message) {
 }
 
 async function renameFolder(d) {
-  if (VIEW_ONLY) { toast(t('viewOnly')); return; }
   const input = await promptText(t('renameFolderPrompt'), d.includes('/') ? baseName(d) : d);
   if (!input) return;
   const clean = input.split('/').map(x => x.replace(/[\\:*?"<>|]/g, '').trim()).filter(Boolean).join('/');
   if (!clean) return;
   // "/" içeriyorsa kökten tam yol (taşıma), yoksa aynı yerde yeni ad
   const nd = input.includes('/') ? clean : (dirName(d) ? dirName(d) + '/' : '') + clean;
+  return moveFolderTo(d, nd);
+}
+
+/** Klasör seçici (iPhone'da yazmadan): aranabilir liste. Kök = ''. */
+function pickFolder(title, exclude) {
+  return new Promise(res => {
+    const all = ['', ...allDirs()].filter(x => !exclude || (x !== exclude && !x.startsWith(exclude + '/')));
+    const q = h('input', { class: 'field', placeholder: t('search'), autocapitalize: 'off' });
+    const box = h('div', { class: 'pick-list folder-pick' });
+    const draw = () => {
+      const f = fold(q.value.trim());
+      box.replaceChildren(...all.filter(x => !f || fold(x).includes(f)).slice(0, 200).map(x =>
+        h('button', { class: 'item', onclick: () => { closeModal(); res(x); } },
+          h('span', { class: 'ico' }, x ? '📁' : '⌂'),
+          h('span', { class: 'main' }, h('span', { class: 'name' }, x ? baseName(x) : t('root')), x.includes('/') ? h('span', { class: 'sub' }, dirName(x)) : ''))));
+    };
+    q.addEventListener('input', draw); draw();
+    modal(h('div', { class: 'modal-head' }, h('h2', {}, title), h('button', { class: 'mh-btn', onclick: () => { closeModal(); res(null); } }, '✕')), q, box, h('div', { class: 'btn-row' }, h('button', { class: 'btn', onclick: () => { closeModal(); res(null); } }, t('cancel'))));
+  });
+}
+
+async function moveFolder(d) {
+  const target = await pickFolder(t('moveTo', { name: baseName(d) }), d);
+  if (target === null) return;
+  return moveFolderTo(d, (target ? target + '/' : '') + baseName(d));
+}
+
+/** Klasörü kopyala: içerik yeniden yüklenmez (aynı blob), tek commit. */
+async function copyFolder(d) {
+  const target = await pickFolder(t('copyTo', { name: baseName(d) }), null);
+  if (target === null) return;
+  let nd = (target ? target + '/' : '') + baseName(d);
+  if (nd === d || (S.dirs.has(nd) && countIn(nd))) nd += ' (' + t('copyWord') + ')';
+  if (nd.startsWith(d + '/')) { toast(t('folderIntoItself')); return; }
+  const songs = songsUnder(d);
+  if (!songs.length) { S.virtualDirs.add(nd); await saveVirtualDirs(); rebuildIndex(); goDir(nd); return; }
+  const pairs = songs.map(r => [r.p, nd + r.p.slice(d.length)]);
+  const changes = pairs.map(([a, b]) => ({ path: 'repertuar/' + b, sha: S.songs.get(a).s, fromP: a }));
+  if (!(await commitFolderChange(songs, changes, `Klasör kopyalandı: ${d} → ${nd}`))) return;
+  const puts = [];
+  for (const [a, b] of pairs) {
+    const r = S.songs.get(a);
+    const nr = decorate({ p: b, t: r.t, e: r.e, n: r.n, s: r.s, dirty: gh().ok ? false : true, m: Date.now(),
+      ...(gh().ok && r.s ? { up: r.s, upAt: Date.now() } : {}) });
+    S.songs.set(b, nr); puts.push(strip(nr));
+  }
+  await db.putSongs(puts);
+  rebuildIndex(); goDir(nd); scheduleSync(800);
+  toast(t('folderCopied', { n: songs.length }));
+}
+
+async function moveFolderTo(d, nd) {
   if (nd === d) return;
   if (nd.startsWith(d + '/')) { toast(t('folderIntoItself')); return; }
   if (S.dirs.has(nd) && countIn(nd)) { toast(t('folderExists')); return; }
@@ -496,7 +576,6 @@ async function renameFolder(d) {
 }
 
 async function deleteFolder(d) {
-  if (VIEW_ONLY) { toast(t('viewOnly')); return; }
   const songs = songsUnder(d);
   if (!(await confirmBox(t('confirmDeleteFolder', { name: d, n: songs.length })))) return;
   if (songs.length > 20) {
@@ -593,11 +672,12 @@ function renderSong() {
   const meta = $('songMeta'); meta.replaceChildren();
   const d = dirName(rec.p);
   if (idx >= 0) meta.append(h('span', { class: 'pos only-phone' }, `${idx + 1}/${S.context.list.length}`));
-  meta.append(h('button', { onclick: () => goDir(d) }, '📁 ' + (d || t('root'))));
+  // sade bilgi satırı: sadece bulunduğu klasörün adı (tam yol değil) + usul/makam etiketi
+  meta.append(h('button', { class: 'meta-folder', title: d || t('root'), onclick: () => goDir(d) }, '📁 ' + (d ? baseName(d) : t('root'))));
   for (const tg of rec._tags) meta.append(h('span', { class: 'tag' }, tg));
-  meta.append(h('span', {}, ENC_LABEL[rec.e] || rec.e || ''));
   if (rec.dirty) meta.append(h('span', { title: t('pending', { n: 1 }) }, '✱'));
-  const dups = duplicatesOf(rec.p);
+  // kopya bilgisi sadece düzenleme yapılan cihazlarda (iPhone'da gizli)
+  const dups = VIEW_ONLY ? [] : duplicatesOf(rec.p);
   if (dups.length) meta.append(h('button', { onclick: () => showDuplicates(rec.p, dups) }, t('duplicates', { n: dups.length })));
   $('lyrics').innerHTML = lyricsHtml(rec.t);
   document.documentElement.style.setProperty('--lyrics-size', S.settings.font + 'px');
@@ -1058,6 +1138,18 @@ async function sync({ quiet = false } = {}) {
       S.notes.dirty = false;
       await db.set('notes', S.notes);
     }
+    // 5) Görünüm (tema, düğme boyutu…) — tüm cihazlarda aynı
+    {
+      const { data: gd, sha: gsha } = await g.getJson('gorunum.json');
+      const mine = S.settings.look || null;
+      if (gd && gd.look && (!mine || (gd.look.updated || 0) > (mine.updated || 0))) {
+        S.settings.look = gd.look; if (gd.look.font) S.settings.font = gd.look.font;
+        saveSettings(); applyLook(); document.documentElement.style.setProperty('--lyrics-size', S.settings.font + 'px');
+      } else if (mine && mine.updated && (!gd || (mine.updated || 0) > ((gd.look || {}).updated || 0))) {
+        await g.putFile('gorunum.json', new TextEncoder().encode(JSON.stringify({ format: 1, look: mine }, null, 1)), 'Görünüm güncellendi', gsha || undefined);
+      }
+      S.lookDirty = false;
+    }
     S.sync.last = Date.now();
     await db.set('lastSync', S.sync.last);
     if (!quiet) toast(t('syncDone'));
@@ -1176,7 +1268,7 @@ function exportZip() {
 
 // ------------------------------------------------------------------ modal yardımcıları
 function modal(...kids) { $('modal').classList.remove('sheet'); $('modalCard').replaceChildren(...kids.filter(Boolean)); $('modal').hidden = false; }
-function closeModal() { $('modal').hidden = true; $('modal').classList.remove('sheet'); $('modalCard').replaceChildren(); }
+function closeModal() { $('modal').hidden = true; $('modal').onclick = null; $('modal').classList.remove('sheet'); $('modalCard').replaceChildren(); }
 function promptText(title, value) {
   return new Promise(res => {
     const inp = h('input', { class: 'field', value });
@@ -1239,7 +1331,12 @@ async function openSettings() {
   const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   modal(
-    h('h2', {}, '⚙ ' + t('settings')),
+    // her zaman görünen başlık: ✕ Kapat ve ⌂ Ana sayfa (uzun sayfayı aşağı kaydırmadan çıkış)
+    h('div', { class: 'modal-head' },
+      h('button', { class: 'mh-btn mh-home', title: t('root'), onclick: async () => { if (await readGh()) { closeModal(); goHome(); } } }, '⌂'),
+      h('h2', {}, '⚙ ' + t('settings')),
+      h('button', { class: 'mh-btn', title: t('close'), onclick: async () => { if (await readGh()) { closeModal(); toast(t('settingsSaved')); } } }, '✕')),
+    h('div', { class: 'btn-row' }, h('button', { class: 'btn primary', onclick: () => { closeModal(); openAppearance(); } }, '🎨 ' + t('appearance'))),
     h('label', {}, t('language')), langSel,
     h('h3', {}, t('github')),
     h('div', { class: 'grid2' }, h('div', {}, h('label', {}, t('owner')), f.owner), h('div', {}, h('label', {}, t('repo')), f.repo)),
@@ -1311,6 +1408,56 @@ function applyLang() {
   renderList();
   if (S.current && !$('song').hidden) renderSong(); else if ($('editor').hidden) renderEmpty();
   updateSyncDot();
+}
+
+// ------------------------------------------------------------------ görünüm (tema, düğme boyutu, düzen) — tüm cihazlara senkron
+const LOOK_DEFAULT = { theme: 'gold', ui: 1, meta: true, tags: true, phoneClock: false, font: 22, updated: 0 };
+const THEMES = [
+  ['gold', 'themeGold', ['#0b0b0b', '#d4af37', '#f2ead3']],
+  ['bw', 'themeBw', ['#000000', '#ffffff', '#8a8a8a']],
+  ['light', 'themeLight', ['#fbfaf7', '#9a7414', '#15130e']],
+  ['navy', 'themeNavy', ['#0a1020', '#d4af37', '#eef2fb']],
+  ['red', 'themeRed', ['#0d0606', '#e0b44a', '#f6ece6']],
+];
+function look() { return { ...LOOK_DEFAULT, ...(S.settings.look || {}) }; }
+function applyLook(L = look()) {
+  const r = document.documentElement;
+  if (L.theme && L.theme !== 'gold') r.dataset.theme = L.theme; else delete r.dataset.theme;
+  r.style.setProperty('--ui', L.ui || 1);
+  r.classList.toggle('hide-meta', !L.meta);
+  r.classList.toggle('hide-tags', !L.tags);
+  r.classList.toggle('show-clock', !!L.phoneClock);
+  const tc = { gold: '#0b0b0b', bw: '#000000', light: '#fbfaf7', navy: '#0a1020', red: '#0d0606' }[L.theme] || '#0b0b0b';
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', tc);
+}
+function openAppearance() {
+  const before = look();
+  const L = { ...before };
+  const seg = (opts, key, onChange) => h('div', { class: 'seg' }, ...opts.map(([v, label]) => h('button', {
+    class: L[key] === v ? 'on' : '', onclick: e => { L[key] = v; for (const b of e.target.parentNode.children) b.classList.remove('on'); e.target.classList.add('on'); applyLook(L); onChange && onChange(v); } }, label)));
+  const sw = h('div', { class: 'theme-row' }, ...THEMES.map(([id, label, cols]) => h('button', {
+    class: 'theme-sw' + (L.theme === id ? ' on' : ''), style: `background:${cols[0]};color:${cols[2]}`,
+    onclick: e => { L.theme = id; for (const b of sw.children) b.classList.remove('on'); e.currentTarget.classList.add('on'); applyLook(L); } },
+    h('div', { class: 'sw-bar' }, ...cols.map(c => h('i', { style: `background:${c};border:1px solid ${cols[1]}` }))), h('b', {}, t(label)))));
+  const cancel = () => { applyLook(before); document.documentElement.style.setProperty('--lyrics-size', S.settings.font + 'px'); closeModal(); };
+  const save = () => {
+    S.settings.look = { ...L, updated: Date.now() };
+    S.settings.font = L.font; document.documentElement.style.setProperty('--lyrics-size', L.font + 'px');
+    S.lookDirty = true; saveSettings(); applyLook(); closeModal(); scheduleSync(500); toast(t('lookSaved'));
+  };
+  modal(h('div', { class: 'modal-head' }, h('h2', {}, '🎨 ' + t('appearance')),
+      h('button', { class: 'mh-btn mh-save', onclick: () => save() }, t('save')),
+      h('button', { class: 'mh-btn', title: t('cancel'), onclick: () => cancel() }, '✕')),
+    h('h3', {}, t('theme')), sw,
+    h('h3', {}, t('buttonSize')), seg([[0.85, t('sizeS')], [1, t('sizeM')], [1.2, t('sizeL')], [1.4, t('sizeXL')]], 'ui'),
+    h('h3', {}, t('lyricsSize')), seg([[18, 'A'], [22, 'A+'], [28, 'A++'], [34, 'A+++']], 'font', v => document.documentElement.style.setProperty('--lyrics-size', v + 'px')),
+    h('h3', {}, t('layout')),
+    h('label', {}, t('infoLine')), seg([[true, t('show')], [false, t('hide')]], 'meta'),
+    h('label', {}, t('tagsLabel')), seg([[true, t('show')], [false, t('hide')]], 'tags'),
+    h('label', {}, t('phoneTop')), seg([[false, 'HAKANO REPERTUVAR'], [true, t('clockWord')]], 'phoneClock'),
+    h('p', {}, t('lookSyncNote')),
+    h('div', { class: 'btn-row' }, h('button', { class: 'btn primary', onclick: save }, t('save')), h('button', { class: 'btn', onclick: cancel }, t('cancel'))));
+  $('modal').onclick = e => { if (e.target === $('modal')) cancel(); };
 }
 
 // ------------------------------------------------------------------ paneller: genişlik, gizle, liste boyu, araç çubuğu
@@ -1493,6 +1640,7 @@ async function start() {
   loadUi();
   applyLang();
   applyPanels();
+  applyLook();
   tick(); setInterval(tick, 1000);
   registerSW();
   requestPersist();

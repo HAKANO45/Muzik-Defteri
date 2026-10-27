@@ -1,5 +1,12 @@
 # Yol haritası
 
+## v5.0.0 — tamam (her biri önce önizleme resmiyle onaylandı)
+- iPhone üst çubuk: büyük ‹ Geri ve dolu altın ⌂, ortada HAKANO REPERTUVAR (saat yerine; sahne modunda saat var); alt çubukta büyük ‹ ›
+- Sade bilgi satırı: sadece klasör adı (tam yol değil) + usul/makam; "Windows‑1254" kalktı; kopya bilgisi iPhone'da gizli
+- Klasör menüsü (⋯ veya uzun bas, iPhone dahil): yeniden adlandır, içine yeni klasör, kopyala, taşı (listeden hedef seç), sil
+- ⚙ → 🎨 Görünüm: 5 tema (Siyah‑Altın, Siyah‑Beyaz, Beyaz, Lacivert‑Altın, Bordo‑Altın), düğme boyutu (4 kademe), şarkı yazısı, bilgi satırı/etiketler göster‑gizle, iPhone başlık/saat — Kaydet ile `gorunum.json` üzerinden tüm cihazlara senkron
+- Ayarlar, Görünüm ve klasör seçicide sabit üst satır: ⌂ ana sayfa, ✕ kapat
+
 ## v4.8.0 — tamam
 - iPhone / dar ekran: üst çubukta ⌂ (ana klasöre dön, şarkıyı kapatır, aramayı temizler); klasör içindeyken büyük "⌂ Repertuvar" ve "‹ Üst klasör" düğmeleri
 

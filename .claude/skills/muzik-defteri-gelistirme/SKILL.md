@@ -9,13 +9,15 @@ description: Müzik Defteri (HAKANO45/Muzik-Defteri) PWA uygulamasına özellik 
 Windows 11 (Edge/Chrome), iPad ve iPhone (Safari) üzerinde **tek kod** ile çalışan, yüklenebilir, internetsiz açılan bir PWA.
 
 ## Değişmez kararlar (kullanıcı istedi — sormadan değiştirme)
-- Tema **sabit siyah‑altın**. Tema seçici ekleme.
+- **Önce önizleme resmi:** Arayüzde bir değişikliği yayınlamadan önce iPhone (ve gerekirse masaüstü) ekran görüntüsüyle önce/sonra resmi hazırla, kullanıcıya gönder, "tamam" demeden `main`'e push etme.
+- Kullanıcı ~50 yaşında: düğmeler büyük ve belirgin olmalı, küçük gri yazı/ikon ekleme.
+- Tema: varsayılan siyah‑altın; kullanıcı ⚙ → Görünüm'den tema/düğme boyutu seçer (`gorunum.json`, tüm cihazlara senkron). Yeni renk kullanırken sabit renk yazma, `:root` değişkenlerini kullan (`--soft`, `--active`, `--on-gold` …) ki tüm temalarda çalışsın; boyutlarda `calc(… * var(--ui))`.
 - Arayüz **Türkçe + İngilizce**. Her yeni metin `js/i18n.js` içinde **iki dile birden** eklenir; koda düz metin yazılmaz, `t('anahtar')` kullanılır.
-- Üst çubukta **dijital saat** her zaman görünür; sahne modunda da saat var.
+- Dijital saat: masaüstü/iPad üst çubukta ve sahne modunda var; iPhone üst çubuğunda varsayılan olarak ortada "HAKANO REPERTUVAR" yazar (Görünüm'den saate çevrilebilir).
 - Sade arayüz. Derleme adımı yok (bundler, npm bağımlılığı yok) — saf ES modülleri. GitHub Pages doğrudan depo kökünü yayınlar.
 - Not etiketi sırası (kullanıcı kararı): `🎤 Eylem · 🎵 LAm · BPM 90 · 🥁 Slow 1 Pro · not` — BPM'de emoji yok.
 - Ton yazımı: **LAm, REm, FA#m, SI♭** (nota büyük, minör küçük m) — `tonLabel()`; veride `Lam` saklanır, gösterimde çevrilir.
-- **iPhone sadece görüntüleme** (`VIEW_ONLY`, user‑agent ile; yatay iPhone dahil). Şarkı ekleme/düzenleme/silme/klasör/içe aktarma yalnız Windows, MacBook, iPad. Yeni düzenleme özelliği eklersen `VIEW_ONLY` ile gizle ve fonksiyonun başına koruma koy. "İnternette ara" iPhone'da da var.
+- **iPhone şarkılar için sadece görüntüleme** (`VIEW_ONLY`, user‑agent ile; yatay iPhone dahil). Şarkı ekleme/düzenleme/silme/içe aktarma yalnız Windows, MacBook, iPad. **Klasör işlemleri (⋯ menüsü: yeniden adlandır, yeni, kopyala, taşı, sil) iPhone'da da açık.** Yeni düzenleme özelliği eklersen `VIEW_ONLY` ile gizle ve fonksiyonun başına koruma koy. "İnternette ara" iPhone'da da var.
 - Şarkı sözleri bu **public** depoya ASLA girmez. Sözler `HAKANO45/-Muzik-Defteri-Repertuar` (private) deposundadır. Test verisi gerekiyorsa uydurma metin kullan.
 
 ## Dosyalar
