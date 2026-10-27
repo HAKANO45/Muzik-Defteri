@@ -1,5 +1,8 @@
 # Yol haritası
 
+## v5.3.1 — tamam (önizlemeyle onaylandı)
+- iPhone ⋯ menüsünde büyük Not düğmesi: solist, ton, BPM (TAP), style, kısa not iPhone'dan da düzenlenir (söz düzenleme hâlâ kapalı).
+
 ## v5.3.0 — tamam (önizlemeyle onaylandı)
 - ↕ Kendi sıralama: klasör başına ▲▼ ile sıra, `siralama.json` ile tüm cihazlara senkron; A→Z sıfırlar. Klasörler üstte, şarkılar altta.
 - ☑ Çoklu seçim: kopyala / taşı (klasör seçici) / yeniden adlandır (tek) / sil — tek commit, blob sha yeniden kullanılır; programlar, notlar, favoriler yeni yola çevrilir.
