@@ -2257,7 +2257,9 @@ async function openSettings() {
       h('button', { class: 'mh-btn mh-home', title: t('root'), onclick: async () => { if (await readGh()) { closeModal(); goHome(); } } }, '⌂'),
       h('h2', {}, '⚙ ' + t('settings')),
       h('button', { class: 'mh-btn', title: t('close'), onclick: async () => { if (await readGh()) { closeModal(); toast(t('settingsSaved')); } } }, '✕')),
-    h('div', { class: 'btn-row' }, h('button', { class: 'btn primary', onclick: () => { closeModal(); openAppearance(); } }, '🎨 ' + t('appearance'))),
+    h('div', { class: 'btn-row' }, h('button', { class: 'btn primary', onclick: () => { closeModal(); openAppearance(); } }, '🎨 ' + t('appearance')),
+      S.tonOpen ? h('button', { class: 'btn ton-set', onclick: () => { closeModal(); lockTon(); } }, '🔒 ' + t('tonHide'))
+                : h('button', { class: 'btn ton-set', onclick: () => { openTonDefteri(); } }, '🎼 ' + t('tonShow'))),
     h('label', {}, t('language')), langSel,
     h('h3', {}, t('github')),
     h('div', { class: 'grid2' }, h('div', {}, h('label', {}, t('owner')), f.owner), h('div', {}, h('label', {}, t('repo')), f.repo)),
