@@ -46,7 +46,7 @@ export async function loadGuesser() {
 }
 export const guesserReady = () => !!GUESS;
 let memoIn = null, memoOut = null;
-function deasc(text) { if (text !== memoIn) { memoIn = text; memoOut = GUESS.deasciify(text).text; } return memoOut; }
+function deasc(text) { if (text !== memoIn) { memoIn = text; memoOut = (GUESS.deasciify(text) || { text }).text; } return memoOut; }
 
 /** pers: kişisel seçimler { acc: {iskelet: doğru}, rej: Set('iskelet>öneri') } */
 function candidates(text, lex, pers, useGuess = true) {
