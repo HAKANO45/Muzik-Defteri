@@ -1,5 +1,8 @@
 # Yol haritası
 
+## v5.10.1 — tamam (önizlemeyle onaylandı)
+- Ağaçta ↕ sıralama: açık klasörlerin içindeki şarkı/klasörler ▲▼ ve (masaüstünde) sürükle-bırak ile kendi klasöründe; ☑ seçim ağaçta (farklı klasörlerden seçip birlikte taşı/kopyala/sil). Kaydırma yeri korunur.
+
 ## v5.10.0 — tamam (önizlemeyle onaylandı)
 - 📄 PDF / Word (.docx) içe aktar (`js/belge.js`, pdf.js legacy `js/vendor/pdfjs`, cihazda): her dosya klasör (kapak yazısı, usul başa), başlık = şarkı, uyarlanır sütun sınırı, çok satırlı başlık, küçük usul yazısı (5-8) dosya adının başına, 2×2 ızgara sırası; önizleme (tik, ad düzeltme, "zaten var"), tek commit, klasör sırası PDF sırası. Gerçek PDF ile test (Karadeniz_2023: 11 şarkı). Eski .doc ve taranmış PDF desteklenmez.
 
