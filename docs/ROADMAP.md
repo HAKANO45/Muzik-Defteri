@@ -1,5 +1,8 @@
 # Yol haritası
 
+## v5.10.2 — tamam (önizlemeyle onaylandı)
+- Sürükle-bırak ile klasöre taşıma (Mac/Windows): şarkıyı ya da ☑ seçilenlerin hepsini bir klasör satırının veya "Repertuvar" yazısının üstüne bırak → onay → tek commit (`dropMove`, `dropTarget`, sürüklenenler bellekte: Safari).
+
 ## v5.10.1 — tamam (önizlemeyle onaylandı)
 - Ağaçta ↕ sıralama: açık klasörlerin içindeki şarkı/klasörler ▲▼ ve (masaüstünde) sürükle-bırak ile kendi klasöründe; ☑ seçim ağaçta (farklı klasörlerden seçip birlikte taşı/kopyala/sil). Kaydırma yeri korunur.
 
