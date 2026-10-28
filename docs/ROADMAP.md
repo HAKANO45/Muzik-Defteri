@@ -1,5 +1,8 @@
 # Yol haritası
 
+## v5.10.0 — tamam (önizlemeyle onaylandı)
+- 📄 PDF / Word (.docx) içe aktar (`js/belge.js`, pdf.js legacy `js/vendor/pdfjs`, cihazda): her dosya klasör (kapak yazısı, usul başa), başlık = şarkı, uyarlanır sütun sınırı, çok satırlı başlık, küçük usul yazısı (5-8) dosya adının başına, 2×2 ızgara sırası; önizleme (tik, ad düzeltme, "zaten var"), tek commit, klasör sırası PDF sırası. Gerçek PDF ile test (Karadeniz_2023: 11 şarkı). Eski .doc ve taranmış PDF desteklenmez.
+
 ## v5.9.0 — tamam (önizlemeyle onaylandı)
 - 🔤 Düzelt: düzenleme ekranında Türkçe harf önerileri (✓/✕), BÜYÜK→normal yazı, fazla boş satır, dosya adı; klasör menüsünde toplu "Türkçe harf düzelt" (liste → onay → tek commit, kodlama korunur, yollar remap). Sözlük `bundle/sozluk.json.gz` (data deposu `tools/build_sozluk.py`, Action üretir; ≥3 geçiş, %90 baskın, tümü büyük harf kelimeler sayılmaz). `js/turkce.js`.
 - commitBatch: yeni blob'lar 6'şar paralel.

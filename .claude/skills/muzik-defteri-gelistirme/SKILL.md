@@ -56,6 +56,8 @@ Kütüphane listesi ağaçtır (`renderTree`, `toggleDir`, `openDirs`): tek doku
 
 🔤 Düzelt: `js/turkce.js` (Python `tools/turkce_harf.py` ile aynı kurallar); sözlük senkronda `refreshLexicon` ile `db 'sozluk'`a iner. Toplu düzeltme `fixFolder` → `commitFolderChange` (bytes destekli). Test: `tools/e2e-fix.js`.
 
+PDF/Word içe aktar: `js/belge.js` (`parsePdf`, `parseDocx`), UI `importDocuments` (📄 düğmesi, Ayarlar, sürükle-bırak). Test: `FX=<örnek klasörü> FILES=a.pdf node tools/e2e-doc.js` — örnek PDF'ler (söz içerir) depoya KONMAZ.
+
 Sıralama: `siralama.json` → klasör başına ad listesi (`orderedChildren`, `moveItem`); sırası olmayanlar alfabetik sona. Liste satırlarında tek dokunuş = aç, çift dokunuş = menü (`addTaps`), basılı tut = menü (`addLongPress`). Çoklu seçim: `S.sel`, `filesCopyMove`, `filesDelete`, `renameSong` (iPhone'da da açık — dosya yönetimi).
 
 Şarkı notları: `notlar.json` → `{ notes: { <yol>: { solist, bpm, ton, style, not, updated, deleted? } } }` — yol başına `updated` ile birleştirilir. Şarkı yeniden adlandırılınca/taşınınca not da taşınır (`replacePathEverywhere`). Toplu taşımada (repertuvar düzenleme) `notlar.json` ve `programlar.json` yolları da güncellenmeli.
