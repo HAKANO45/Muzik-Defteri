@@ -5,9 +5,9 @@ import { bytesToSong, songToBytes, ENC_LABEL, gitBlobSha } from './encoding.js';
 import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
-import { suggest, fixAll, fixName, mostlyUpper, toSentence, tidyBlank } from './turkce.js';
+import { suggest, fixAll, fixName, mostlyUpper, toSentence, tidyBlank, loadGuesser, key as trKey, trLower } from './turkce.js';
 
-export const VERSION = '5.10.2';
+export const VERSION = '5.11.0';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -1397,34 +1397,54 @@ async function getLexicon() {
   return LEX ? LEX.w : null;
 }
 function markFixes(text, words, skip) {
-  // önizleme: düzeltilen kelimeler işaretli
-  const map = new Map(words.filter(w => !skip.has(w.from)).map(w => [w.from, w.to]));
-  return escapeHtml(text).replace(/[A-Za-zÇĞİÖŞÜçğıöşüÂÎÛâîû]+/g, w => map.has(w) ? `<mark class="fix">${escapeHtml(map.get(w))}</mark>` : w);
+  // önizleme: düzeltilen kelimeler işaretli (tahminler turuncu)
+  const map = new Map(words.filter(w => !skip.has(w.from)).map(w => [w.from, w]));
+  return escapeHtml(text).replace(/[A-Za-zÇĞİÖŞÜçğıöşüÂÎÛâîû]+/g, w => map.has(w) ? `<mark class="fix${map.get(w).src === 'guess' ? ' guess' : ''}">${escapeHtml(map.get(w).to)}</mark>` : w);
 }
+// kişisel seçimler: ✓ verilen tahmin kesinleşir, ✕ verilen öneri bir daha gelmez (kisisel-sozluk.json ile senkron)
+function persObj() { const p = S.pers || {}; return { acc: p.acc || {}, rej: new Set(p.rej || []) }; }
+function rememberChoices(words, skip) {
+  const p = S.pers = S.pers || { acc: {}, rej: [], updated: 0 };
+  const rej = new Set(p.rej);
+  let changed = false;
+  for (const w of words) {
+    const k = trKey(w.from), to = trLower(w.to);
+    if (skip.has(w.from)) { if (!rej.has(k + '>' + to)) { rej.add(k + '>' + to); changed = true; } }
+    else if (w.src === 'guess' && p.acc[k] !== to) { p.acc[k] = to; changed = true; }
+  }
+  if (!changed) return;
+  p.rej = [...rej]; p.updated = Date.now(); p.dirty = true;
+  db.set('pers', p); scheduleSync();
+}
+async function guessReady() { try { await loadGuesser(); return true; } catch (e) { console.warn('tahminci', e); return false; } }
 
 /** Düzenleme ekranı: öneriler ✓/✕, biçim seçenekleri, uygula ve kaydet */
 async function openFixDialog(ta, nameIn, save) {
   const lex = await getLexicon(); if (!lex) return;
+  await guessReady();
+  const pers = persObj();
   const text = ta.value.replace(/\r\n?/g, '\n');
-  const words = suggest(text, lex);
+  const words = suggest(text, lex, pers, 'always');
   const skip = new Set();
   const opt = { upper: mostlyUpper(text), blank: tidyBlank(text) !== text, name: false };
   const oldName = nameIn ? nameIn.value : '';
-  const newName = nameIn ? fixName(oldName, lex) : '';
+  const newName = nameIn ? fixName(oldName, lex, pers) : '';
   opt.name = !!nameIn && newName !== oldName;
   const prev = h('pre', { class: 'fix-prev lyrics' });
-  const draw = () => { const out = fixAll(text, lex, { upper: opt.upper, blank: opt.blank, skip }); prev.innerHTML = markFixes(opt.upper ? text : out, words, skip); if (opt.upper) prev.textContent = out; };
+  const draw = () => { const out = fixAll(text, lex, { upper: opt.upper, blank: opt.blank, skip, pers, guess: 'always' }); prev.innerHTML = markFixes(opt.upper ? text : out, words, skip); if (opt.upper) prev.textContent = out; };
   const sugList = h('div', { class: 'fix-list' }, ...words.map(w => {
-    const row = h('div', { class: 'fix-sug' },
-      h('span', { class: 'w' }, h('s', {}, w.from), ' → ', h('b', {}, w.to), w.n > 1 ? h('small', {}, ` ×${w.n}`) : ''),
+    const row = h('div', { class: 'fix-sug' + (w.src === 'guess' ? ' guess' : '') },
+      h('span', { class: 'w' }, h('s', {}, w.from), ' → ', h('b', {}, w.to), w.n > 1 ? h('small', {}, ` ×${w.n}`) : '',
+        w.src === 'guess' ? h('span', { class: 'guess-tag' }, t('fixGuess')) : ''),
       h('button', { class: 'fix-ok on', onclick: () => { skip.delete(w.from); row.classList.remove('off'); draw(); } }, '✓'),
       h('button', { class: 'fix-no', onclick: () => { skip.add(w.from); row.classList.add('off'); draw(); } }, '✕'));
     return row;
   }));
   const chip = (key, label, show = true) => show ? h('button', { class: 'chip-opt' + (opt[key] ? ' on' : ''), onclick: e => { opt[key] = !opt[key]; e.currentTarget.classList.toggle('on', opt[key]); draw(); } }, label) : null;
   const apply = () => {
-    ta.value = fixAll(text, lex, { upper: opt.upper, blank: opt.blank, skip });
+    ta.value = fixAll(text, lex, { upper: opt.upper, blank: opt.blank, skip, pers, guess: 'always' });
     if (nameIn && opt.name) nameIn.value = newName;
+    rememberChoices(words, skip);
     closeModal(); save();
   };
   draw();
@@ -1438,27 +1458,47 @@ async function openFixDialog(ta, nameIn, save) {
       chip('upper', t('fixUpper')), chip('blank', t('fixBlank')),
       chip('name', t('fixName') + (newName !== oldName ? ': ' + newName : ''), !!nameIn && newName !== oldName)),
     h('div', { class: 'btn-row' }, h('button', { class: 'btn primary fix-apply', onclick: apply }, '✓ ' + t('fixApply')), h('button', { class: 'btn', onclick: closeModal }, t('cancel'))),
-    h('p', { class: 'hint' }, t('fixNote')),
+    h('p', { class: 'hint' }, t('fixNote') + ' ' + t('fixGuessNote')),
   );
 }
 
 /** Klasörün tamamında düzelt: önce liste, onay, tek commit (kodlama korunur). */
+/** Ayarlar: Türkçe harfi eksik görünen şarkılar (ş/ğ/ı hiç yok) klasör klasör — tıkla → klasörde düzelt */
+function missingLettersBox() {
+  const by = new Map(); let total = 0;
+  for (const r of visibleSongs()) {
+    if (/[şğıŞĞ]/.test(r.t) || (r.t.match(/\p{L}/gu) || []).length < 40) continue;
+    total++; const d = dirName(r.p); by.set(d, (by.get(d) || 0) + 1);
+  }
+  const top = [...by.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
+  return h('div', { class: 'miss-box' },
+    h('h3', {}, '🔤 ' + t('missTitle', { n: total })),
+    h('p', { class: 'hint' }, t('missHelp')),
+    h('div', { class: 'miss-list' }, ...top.map(([d, n]) => h('button', { class: 'miss-row', onclick: () => { closeModal(); fixFolder(d); } },
+      h('span', { class: 'name' }, '📁 ' + (d || t('root'))), h('b', {}, n)))));
+}
+
 async function fixFolder(d) {
   if (VIEW_ONLY) { toast(t('viewOnly')); return; }
   const lex = await getLexicon(); if (!lex) return;
-  const opt = { turkish: true, blank: true, upper: false, name: true };
+  const opt = { turkish: true, guess: await guessReady(), blank: true, upper: false, name: true, pers: persObj() };
   const all = songsUnder(d);
   const box = h('div', { class: 'fix-folder-list' });
   const info = h('h3', {});
   let rows = [];
-  const scan = () => {
+  let scanId = 0;
+  const scan = async () => {
+    const my = ++scanId;
     rows = [];
+    info.textContent = '⏳ …'; box.replaceChildren();
+    let k = 0;
     for (const r of all) {
+      if (++k % 150 === 0) { info.textContent = `⏳ ${k} / ${all.length}`; await new Promise(res => setTimeout(res, 0)); if (my !== scanId) return; }
       const text = fixAll(r.t, lex, opt);
       const stem = baseName(r.p).replace(/\.txt$/i, '');
-      const ns = opt.name ? fixName(stem, lex) : stem;
+      const ns = opt.name ? fixName(stem, lex, opt.pers) : stem;
       if (text === r.t && ns === stem) continue;
-      const ex = opt.turkish ? suggest(r.t, lex).slice(0, 4).map(w => w.from + '→' + w.to).join(', ') : '';
+      const ex = opt.turkish ? suggest(r.t, lex, opt.pers, opt.guess).slice(0, 5).map(w => w.from + '→' + w.to + (w.src === 'guess' ? '~' : '')).join(', ') : '';
       rows.push({ r, text, np: ns !== stem ? (dirName(r.p) ? dirName(r.p) + '/' : '') + ns + '.txt' : null, ex, on: true });
     }
     info.textContent = t('fixFound', { n: rows.length, m: all.length });
@@ -1501,7 +1541,7 @@ async function fixFolder(d) {
   modal(
     h('div', { class: 'modal-head' }, h('h2', {}, '🔤 ' + t('fixFolder')), h('button', { class: 'mh-btn', onclick: closeModal }, '✕')),
     h('p', { class: 'hint' }, '📁 ' + d + ' · ' + t('songs', { n: all.length })),
-    h('div', { class: 'chip-row' }, chip('turkish', t('fixTurkish')), chip('upper', t('fixUpper')), chip('blank', t('fixBlank')), chip('name', t('fixNames'))),
+    h('div', { class: 'chip-row' }, chip('turkish', t('fixTurkish')), chip('guess', t('fixGuessChip')), chip('upper', t('fixUpper')), chip('blank', t('fixBlank')), chip('name', t('fixNames'))),
     info, box,
     h('div', { class: 'btn-row' }, h('button', { class: 'btn primary fix-apply', onclick: run }, '✓ ' + t('fixApplyFolder')), h('button', { class: 'btn', onclick: closeModal }, t('cancel'))),
     h('p', { class: 'hint' }, t('fixNote')),
@@ -1722,6 +1762,18 @@ async function sync({ quiet = false } = {}) {
       S.notes.dirty = false;
       await db.set('notes', S.notes);
     }
+    // 4a) Kişisel Türkçe harf seçimleri (birleşim)
+    try {
+      const { data: kd, sha: ksha } = await g.getJson('kisisel-sozluk.json');
+      const mine = S.pers || { acc: {}, rej: [] };
+      const acc = { ...((kd && kd.acc) || {}), ...mine.acc };
+      const rej = [...new Set([...((kd && kd.rej) || []), ...(mine.rej || [])])];
+      const merged = { format: 1, acc, rej };
+      const changedK = JSON.stringify(merged) !== JSON.stringify({ format: 1, acc: (kd && kd.acc) || {}, rej: (kd && kd.rej) || [] });
+      if (changedK && (mine.dirty || !kd)) await g.putFile('kisisel-sozluk.json', new TextEncoder().encode(JSON.stringify(merged, null, 1)), 'Kişisel Türkçe sözlük güncellendi', ksha || undefined);
+      S.pers = { acc, rej, updated: Date.now() };
+      await db.set('pers', S.pers);
+    } catch (e) { console.warn('kişisel sözlük', e); }
     // 4b) Sıralama (klasör başına, son değişen kazanır)
     {
       const { data: od, sha: osha } = await g.getJson('siralama.json');
@@ -2032,6 +2084,7 @@ async function openSettings() {
       h('button', { class: 'btn primary', onclick: async () => { if (!(await readGh())) return; closeModal(); sync(); } }, '⟳ ' + t('sync'))),
     status,
     h('p', {}, (pendingCount() ? t('pending', { n: pendingCount() }) + ' · ' : '') + t('lastSync', { time: S.sync.last ? new Date(S.sync.last).toLocaleString(getLang()) : t('never') })),
+    VIEW_ONLY ? null : missingLettersBox(),
     h('h3', {}, t('importExport')),
     h('p', {}, t('importTarget', { f: S.dir || t('root') })),
     VIEW_ONLY ? h('p', {}, t('viewOnly')) : null,
@@ -2348,6 +2401,7 @@ async function start() {
   if (notes && notes.notes) S.notes = notes;
   try { S.removed = (await db.get('removed')) || {}; } catch (_) {}
   try { const o = await db.get('order'); if (o && o.order) S.order = o; } catch (_) {}
+  try { S.pers = (await db.get('pers')) || null; } catch (_) {}
   if (Array.isArray(vdirs)) S.virtualDirs = new Set(vdirs);
   if (settings) S.settings = { ...S.settings, ...settings, gh: { ...S.settings.gh, ...(settings.gh || {}) } };
   if (programs) S.programs = { ...S.programs, ...programs };

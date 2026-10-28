@@ -1,9 +1,9 @@
 // Servis çalışanı: uygulama dosyalarını önbelleğe alır -> internetsiz açılır.
 // YENİ SÜRÜM YAYINLARKEN: CACHE adını artır (ör. md-v4.0.1), yoksa cihazlar eski dosyayı kullanır.
-const CACHE = 'md-v5.10.2';
+const CACHE = 'md-v5.11.0';
 const FILES = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
-  'js/app.js', 'js/db.js', 'js/github.js', 'js/encoding.js', 'js/codepages.js', 'js/zip.js', 'js/textutil.js', 'js/i18n.js', 'js/turkce.js', 'js/belge.js',
+  'js/app.js', 'js/db.js', 'js/github.js', 'js/encoding.js', 'js/codepages.js', 'js/zip.js', 'js/textutil.js', 'js/i18n.js', 'js/turkce.js', 'js/belge.js', 'js/vendor/deasciifier/deasciifier.mjs', 'js/vendor/deasciifier/patterns.json',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
 ];
 

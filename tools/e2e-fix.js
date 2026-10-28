@@ -32,13 +32,19 @@ const O = process.env.OUT || '/tmp'; const puts = [], blobs = [], trees = [], co
   await page.click('#songToolbar button[title="Düzenle"]'); await page.waitForTimeout(300);
   await page.click('.btn.fix-btn'); await page.waitForTimeout(500);
   const sugs = await page.$$eval('.fix-sug', e => e.map(x => x.querySelector('.w').textContent));
-  console.log('öneriler', sugs.length, sugs.slice(0, 8));
-  await page.screenshot({ path: O + '/f1.png' });
+  console.log('öneriler', sugs.length, sugs.slice(0, 12), 'tahmin', await page.locator('.fix-sug.guess').count());
+  await page.evaluate(() => { const l = document.querySelector('.fix-list'); if (l) l.scrollTop = 1e4; const p = document.querySelector('.fix-prev'); if (p) p.scrollTop = 1e4; }); await page.screenshot({ path: O + '/f1.png' });
   await page.locator('.fix-sug').nth(0).locator('.fix-no').click(); await page.waitForTimeout(150);
   await page.click('.fix-apply'); await page.waitForTimeout(800);
   const rec = await page.evaluate(() => { const r = window.__md.songs.get('9-8 Roman/01.Abe kaynana neyap.txt'); return { t: r.t.slice(0, 120), e: r.e, dirty: r.dirty }; });
   console.log('kaydedildi', rec);
   await page.screenshot({ path: O + '/f2.png' });
+  console.log('kişisel', JSON.stringify(await page.evaluate(() => window.__md.pers)).slice(0, 200));
+  // ayarlar: eksik harfli şarkılar
+  await page.click('#btnSettings'); await page.waitForTimeout(400);
+  await page.locator('.miss-box').scrollIntoViewIfNeeded(); await page.screenshot({ path: O + '/f-miss.png' });
+  console.log('eksik', await page.textContent('.miss-box h3'));
+  await page.keyboard.press('Escape'); await page.evaluate(() => document.querySelector('#modal') && (document.querySelector('#modal').hidden = true));
   // 2) klasörde toplu
   await page.evaluate(() => window.__mdGo('')); await page.waitForTimeout(300);
   await page.locator('.item.tree-dir', { hasText: '9-8 Roman' }).first().dblclick(); await page.waitForTimeout(400);

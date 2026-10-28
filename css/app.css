@@ -506,3 +506,13 @@ mark.fix { background: rgba(212,177,58,.25); color: var(--gold2); border-bottom:
 /* sürükle-bırak ile klasöre taşıma */
 .item.tree-dir.drop-in, .crumb.drop-in { outline: 3px solid var(--gold); outline-offset: -3px; background: var(--active); }
 .dragging-songs .item.tree-dir { box-shadow: inset 3px 0 0 var(--gold-dim); }
+
+/* tahmin (deasciifier) önerileri: turuncu */
+mark.fix.guess { background: rgba(224,140,40,.25); color: #f0a040; border-bottom-color: #e08c28; }
+.fix-sug.guess { border-color: #c07a20; }
+.fix-sug.guess b { color: #f0a040; }
+.guess-tag { margin-left: 8px; font-size: 11px; font-weight: 800; color: #111; background: #e08c28; border-radius: 6px; padding: 1px 6px; vertical-align: middle; }
+.miss-box { border: 1px solid var(--gold-dim); border-radius: 14px; padding: 6px 12px 10px; margin: 10px 0; background: var(--soft); }
+.miss-list { display: flex; flex-direction: column; gap: 4px; }
+.miss-row { display: flex; justify-content: space-between; align-items: center; min-height: calc(44px * var(--ui)); padding: 6px 10px; border-radius: 10px; border: 1px solid var(--divider); background: var(--bg); color: var(--text); font-size: calc(15px * var(--ui)); text-align: left; }
+.miss-row b { color: var(--gold2); }

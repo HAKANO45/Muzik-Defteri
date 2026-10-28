@@ -34,26 +34,59 @@ function applyCase(orig, cand) {
   return [...cand].map((c, i) => isUpperChar(orig[i]) ? trUpper(c) : c).join('');
 }
 
-/** Metindeki düzeltilebilir kelimeler: [{ from, to, n }] (aynı kelime bir kez, sayısıyla). */
-export function suggest(text, lex) {
+// ---- 2. katman: bağlama bakan tahminci (meacer/deasciifier, MIT) — sözlükte olmayan kelimeler için
+let GUESS = null;
+export async function loadGuesser() {
+  if (GUESS) return GUESS;
+  const m = await import('./vendor/deasciifier/deasciifier.mjs');
+  const pat = await (await fetch(new URL('./vendor/deasciifier/patterns.json', import.meta.url))).json();
+  m.Deasciifier.init(pat);
+  GUESS = m.Deasciifier;
+  return GUESS;
+}
+export const guesserReady = () => !!GUESS;
+let memoIn = null, memoOut = null;
+function deasc(text) { if (text !== memoIn) { memoIn = text; memoOut = GUESS.deasciify(text).text; } return memoOut; }
+
+/** pers: kişisel seçimler { acc: {iskelet: doğru}, rej: Set('iskelet>öneri') } */
+function candidates(text, lex, pers, useGuess = true) {
+  // tahminci sadece hiç ş/ğ/ı içermeyen sözlerde çalışır (asıl sorun bunlar; hem hızlı hem güvenli)
+  const g = useGuess && GUESS && (useGuess === 'always' || !/[şğıŞĞ]/.test(text)) ? deasc(text) : null;
+  const out = [];
+  WORD.lastIndex = 0;
+  let m;
+  while ((m = WORD.exec(text))) {
+    const w = m[0], k = key(w);
+    let to = null, src = 'lex';
+    const best = (pers && pers.acc && pers.acc[k]) || lex[k];
+    if (best && compatible(w, best)) to = applyCase(w, best);
+    else if (g && !/[şğıŞĞİ]/.test(w)) {
+      const gw = g.substr(m.index, w.length);
+      if (gw !== w && /[çğışöüÇĞİŞÖÜ]/.test(gw)) { to = gw; src = 'guess'; }
+    }
+    if (!to || to === w) continue;
+    if (pers && pers.rej && pers.rej.has(k + '>' + trLower(to))) continue;
+    out.push({ i: m.index, w, to, src });
+  }
+  return out;
+}
+
+/** Metindeki düzeltilebilir kelimeler: [{ from, to, n, src }] (aynı kelime bir kez, sayısıyla). src: lex | guess */
+export function suggest(text, lex, pers, useGuess = true) {
   const m = new Map();
-  for (const w of text.match(WORD) || []) {
-    const cand = lex[key(w)];
-    if (!cand || !compatible(w, cand)) continue;
-    const nw = applyCase(w, cand);
-    if (nw === w) continue;
-    const e = m.get(w); if (e) e.n++; else m.set(w, { from: w, to: nw, n: 1 });
+  for (const c of candidates(text, lex, pers, useGuess)) {
+    const e = m.get(c.w); if (e) e.n++; else m.set(c.w, { from: c.w, to: c.to, n: 1, src: c.src });
   }
   return [...m.values()];
 }
 /** Sadece kabul edilen kelimeleri değiştirir (skip: istenmeyen "from" kümesi). */
-export function applyFixes(text, lex, skip = new Set()) {
-  return text.replace(WORD, w => {
-    if (skip.has(w)) return w;
-    const cand = lex[key(w)];
-    if (!cand || !compatible(w, cand)) return w;
-    return applyCase(w, cand);
-  });
+export function applyFixes(text, lex, skip = new Set(), pers, useGuess = true) {
+  let out = '', last = 0;
+  for (const c of candidates(text, lex, pers, useGuess)) {
+    if (skip.has(c.w)) continue;
+    out += text.slice(last, c.i) + c.to; last = c.i + c.w.length;
+  }
+  return out + text.slice(last);
 }
 
 /** Sözlerin çoğu BÜYÜK HARF mi? */
@@ -77,15 +110,15 @@ export function tidyBlank(text) {
 }
 
 /** Hepsi bir arada: { text, words:[...], upper:bool } */
-export function fixAll(text, lex, { turkish = true, upper = false, blank = true, skip } = {}) {
+export function fixAll(text, lex, { turkish = true, upper = false, blank = true, skip, pers, guess = true } = {}) {
   let out = text;
-  if (turkish) out = applyFixes(out, lex, skip);
+  if (turkish) out = applyFixes(out, lex, skip, pers, guess);
   if (upper) out = toSentence(out);
   if (blank) out = tidyBlank(out);
   return out;
 }
 /** Dosya adı (uzantısız): sadece Türkçe harf; ş/ğ/ı içeren ad doğru sayılır. */
-export function fixName(stem, lex) {
+export function fixName(stem, lex, pers) {
   if (/[şğıŞĞİ]/.test(stem)) return stem;
-  return applyFixes(stem, lex).replace(/[\\/:*?"<>|]/g, '');
+  return applyFixes(stem, lex, undefined, pers).replace(/[\\/:*?"<>|]/g, '');
 }
