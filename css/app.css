@@ -546,3 +546,15 @@ mark.fix.guess { background: rgba(224,140,40,.25); color: #f0a040; border-bottom
 .chip.ton-badge { background: var(--gold); color: var(--on-gold); border-color: var(--gold); font-weight: 800; }
 .chip.ton-badge.hakan { background: var(--soft); color: var(--gold2); }
 .chip.ton-badge.duet { background: var(--soft); color: #9fd3ff; border-color: #6aa9d6; }
+
+/* 🎼 Tonlar sekmesi (kenar çubuğunda) */
+.side-head .ton-tabs, .side-head .ton-chips, .side-head .ton-foot { width: 100%; }
+.side-head .ton-foot { grid-template-columns: 1fr 1.3fr auto; position: static; background: none; margin: 4px 0 6px; }
+.side-head .ton-foot .btn { min-height: calc(46px * var(--ui)); font-size: calc(15px * var(--ui)); }
+.ton-row .ico { width: 18px; color: var(--gold); flex: none; text-align: center; }
+.ton-row.nolyr { opacity: .75; }
+.ton-row.active { background: var(--active); box-shadow: inset 3px 0 0 var(--gold); }
+.tabs button[data-tab="tonlar"] { border-color: var(--gold); color: var(--gold2); }
+.tabs button[data-tab="tonlar"].active { color: var(--on-gold); }
+.tabs.five button { padding: 0 4px; min-width: 0; }
+@media (max-width: 600px) { .tabs.five button { font-size: 12px !important; letter-spacing: -.01em; } }
