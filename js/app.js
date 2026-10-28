@@ -7,7 +7,7 @@ import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, e
 import { t, getLang, setLang } from './i18n.js';
 import { suggest, fixAll, fixName, mostlyUpper, toSentence, tidyBlank } from './turkce.js';
 
-export const VERSION = '5.10.1';
+export const VERSION = '5.10.2';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -300,6 +300,40 @@ function toggleDir(d) {
   try { localStorage.setItem(OPEN_KEY, JSON.stringify([...openDirs])); } catch (_) {}
   const sc = $('list').scrollTop; renderList(); $('list').scrollTop = sc;
 }
+/** Sürükle-bırak ile taşıma (Mac/Windows): şarkıyı (☑ seçiliyse seçilenlerin hepsini) bir klasörün üstüne bırak. */
+let DRAG_SONGS = null;   // Safari özel veri türlerini her zaman taşımadığı için sürüklenenler bellekte tutulur
+function dropMove(el, p) {
+  if (VIEW_ONLY) return;
+  const isSong = S.songs.has(p);
+  if (isSong) {
+    el.draggable = true;
+    el.addEventListener('dragstart', e => {
+      const paths = S.sel && S.sel.has(p) ? [...S.sel] : [p];
+      DRAG_SONGS = paths;
+      e.dataTransfer.setData('text/plain', paths.length + ' ♪');
+      e.dataTransfer.effectAllowed = 'move';
+      document.documentElement.classList.add('dragging-songs');
+      el.classList.add('dragging');
+    });
+    el.addEventListener('dragend', () => { el.classList.remove('dragging'); document.documentElement.classList.remove('dragging-songs'); setTimeout(() => { DRAG_SONGS = null; }, 50); });
+    return;
+  }
+  dropTarget(el, p);
+}
+function dropTarget(el, dir) {
+  el.addEventListener('dragover', e => { if (DRAG_SONGS) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; el.classList.add('drop-in'); } });
+  el.addEventListener('dragleave', () => el.classList.remove('drop-in'));
+  el.addEventListener('drop', async e => {
+    el.classList.remove('drop-in');
+    if (!DRAG_SONGS) return;
+    e.preventDefault(); e.stopPropagation();
+    const paths = DRAG_SONGS.filter(x => dirName(x) !== dir); DRAG_SONGS = null;
+    if (!paths.length) return;
+    if (!(await confirmBox(t('dropMoveConfirm', { n: paths.length, d: dir ? baseName(dir) : t('root') })))) return;
+    S.sel = null;
+    await filesCopyMove(paths, 'move', dir);
+  });
+}
 function keepScroll(fn) { const sc = $('list').scrollTop; fn(); $('list').scrollTop = sc; }
 function renderTree(list, dir, level) {
   const { dirs, files } = orderedChildren(dir);
@@ -310,7 +344,7 @@ function renderTree(list, dir, level) {
     h('button', { class: 'sort-btn', onclick: e => { e.stopPropagation(); moveItem(dir, all, p, -1); } }, '▲'),
     h('button', { class: 'sort-btn', onclick: e => { e.stopPropagation(); moveItem(dir, all, p, 1); } }, '▼'));
   const dragable = (el, p) => {
-    if (!sorting) return;
+    if (!sorting) { dropMove(el, p); return; }
     el.draggable = true;
     el.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', JSON.stringify({ dir, p })); el.classList.add('dragging'); });
     el.addEventListener('dragend', () => el.classList.remove('dragging'));
@@ -447,10 +481,10 @@ function uniquePath(dir, name) {
 }
 
 /** Çoklu kopyala / taşı: hedef klasörü listeden seç; tek commit, içerik yeniden yüklenmez */
-async function filesCopyMove(paths, kind) {
+async function filesCopyMove(paths, kind, to) {
   paths = paths.filter(p => S.songs.has(p));
   if (!paths.length) return;
-  const target = await pickFolder(t(kind === 'copy' ? 'copyFilesTo' : 'moveFilesTo', { n: paths.length }), null);
+  const target = to !== undefined ? to : await pickFolder(t(kind === 'copy' ? 'copyFilesTo' : 'moveFilesTo', { n: paths.length }), null);
   if (target === null) return;
   const pairs = [];
   for (const p of paths) {
@@ -544,7 +578,7 @@ function renderList() {
     if (S.dir) head.append(h('div', { class: 'nav-row only-narrow' },
       h('button', { class: 'nav-pill', onclick: goHome }, '⌂ ' + t('root')),
       S.dir ? h('button', { class: 'nav-pill', onclick: () => goDir(dirName(S.dir)) }, '‹ ' + t('upFolder')) : ''));
-    head.append(h('button', { class: 'crumb', onclick: () => goDir('') }, t('root')));
+    { const rc = h('button', { class: 'crumb', onclick: () => goDir('') }, t('root')); dropTarget(rc, ''); head.append(rc); }
     parts.forEach((part, i) => {
       head.append(h('span', { class: 'crumb-sep' }, '›'));
       const d = parts.slice(0, i + 1).join('/');
