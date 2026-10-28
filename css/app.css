@@ -558,3 +558,5 @@ mark.fix.guess { background: rgba(224,140,40,.25); color: #f0a040; border-bottom
 .tabs button[data-tab="tonlar"].active { color: var(--on-gold); }
 .tabs.five button { padding: 0 4px; min-width: 0; }
 @media (max-width: 600px) { .tabs.five button { font-size: 12px !important; letter-spacing: -.01em; } }
+.ton-st.usul { border-color: var(--gold); color: var(--gold2); font-weight: 800; }
+.ton-chips .add-chip { border-style: dashed; border-color: var(--gold); color: var(--gold2); min-width: 44px; font-size: 18px; }

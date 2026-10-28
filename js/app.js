@@ -5,10 +5,10 @@ import { bytesToSong, songToBytes, ENC_LABEL, gitBlobSha } from './encoding.js';
 import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
-import { SINGERS, NOTES as TON_NOTES, STYLES as TON_STYLES, emptyBook, newId, mergeBooks, parsePasted } from './tonlar.js';
+import { SINGERS, NOTES as TON_NOTES, STYLES as TON_STYLES, USULS as TON_USULS, usulOf, tarzOf, normUsul, emptyBook, newId, mergeBooks, parsePasted } from './tonlar.js';
 import { suggest, fixAll, fixName, mostlyUpper, toSentence, tidyBlank, loadGuesser, key as trKey, trLower } from './turkce.js';
 
-export const VERSION = '5.12.1';
+export const VERSION = '5.12.2';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -1571,7 +1571,7 @@ function tonBadges(rec) {
   if (!S.tonOpen || !S.tonBook) return [];
   const k = fold(rec._title).replace(/[^a-z0-9]+/g, '');
   return tonItems().filter(it => it.p === rec.p || fold(it.title).replace(/[^a-z0-9]+/g, '') === k)
-    .map(it => h('span', { class: 'chip ton-badge ' + it.singer }, (SINGERS.find(s => s[0] === it.singer) || ['', ''])[1] + ' · ' + (it.ton || '?')));
+    .map(it => h('span', { class: 'chip ton-badge ' + it.singer }, (SINGERS.find(s => s[0] === it.singer) || ['', ''])[1] + ' · ' + (it.ton || '?') + (usulOf(it) ? ' · ' + usulOf(it) : '')));
 }
 /** Gizli giriş: başlığa 2 sn basılı tut */
 function bindTonEntry() {
@@ -1599,7 +1599,7 @@ function lockTon() {
 function drawTon() { if (S.tab === 'tonlar') keepScroll(renderList); }
 function renderTonTab(head, list) {
   const all = tonItems(TON.singer);
-  const counts = new Map(); for (const it of all) counts.set(it.tarz || '—', (counts.get(it.tarz || '—') || 0) + 1);
+  const counts = new Map(); for (const it of all) { const k = tarzOf(it) || usulOf(it) || '—'; counts.set(k, (counts.get(k) || 0) + 1); }
   head.append(
     h('div', { class: 'ton-tabs' }, ...SINGERS.map(([k, l]) => h('button', { class: TON.singer === k ? 'on' : '', onclick: () => { TON.singer = k; TON.tarz = ''; drawTon(); } }, l + ' · ' + tonItems(k).length))),
     h('div', { class: 'ton-chips' },
@@ -1610,14 +1610,15 @@ function renderTonTab(head, list) {
       h('button', { class: 'btn', onclick: () => tonPaste() }, '📋 ' + t('tonPaste')),
       h('button', { class: 'btn primary ton-add', onclick: () => tonEdit(null) }, '＋ ' + t('tonAdd')),
       h('button', { class: 'btn ton-lock', title: t('tonLock'), onclick: lockTon }, '🔒')));
-  const items = all.filter(it => !TON.tarz || (it.tarz || '—') === TON.tarz);
+  const gk = it => tarzOf(it) || usulOf(it) || '—';
+  const items = all.filter(it => !TON.tarz || gk(it) === TON.tarz);
   const byName = (a, b) => S.collator.compare(a.title, b.title);
   let ordered = [];
   const groups = [];
   if (TON.az || TON.tarz) ordered = items.sort(byName);
   else {
     const g = new Map();
-    for (const it of items) { const k = it.tarz || '—'; if (!g.has(k)) g.set(k, []); g.get(k).push(it); }
+    for (const it of items) { const k = gk(it); if (!g.has(k)) g.set(k, []); g.get(k).push(it); }
     for (const [k, arr] of [...g.entries()].sort((a, b) => b[1].length - a[1].length)) { groups.push([k, ordered.length]); ordered.push(...arr.sort(byName)); }
   }
   // sözlerde ‹ › bu listenin sırasıyla gezer (playlist gibi)
@@ -1630,7 +1631,8 @@ function renderTonTab(head, list) {
     const el = h('div', { class: 'ton-row' + (p ? '' : ' nolyr') + (p && p === S.current ? ' active' : ''), role: 'button', tabindex: 0 },
       h('span', { class: 'ico' }, p ? '♪' : '·'),
       h('div', { class: 'n' }, h('b', {}, showTitle(it.title)), sub ? h('small', {}, sub) : ''),
-      it.tarz ? h('span', { class: 'ton-st' }, it.tarz) : '',
+      usulOf(it) ? h('span', { class: 'ton-st usul' }, usulOf(it)) : '',
+      tarzOf(it) ? h('span', { class: 'ton-st' }, tarzOf(it)) : '',
       h('span', { class: 'ton-key' + (/hicaz|uşşak|rast|nihavent|kürdi|hüzzam|saba/i.test(it.ton || '') ? ' mk' : '') }, it.ton || '—'));
     addTaps(el, () => { if (p) openSong(p, ctx); else tonEdit(it); }, () => tonEdit(it));
     addLongPress(el, () => tonEdit(it));
@@ -1657,9 +1659,24 @@ function tonEdit(it) {
     ['Hicaz', v => /hicaz/i.test(v) ? v.replace(/hicaz\s*/i, '') : 'Hicaz ' + v],
     ['−2', v => v.replace(/\s*[+−-]\d\b/, '') + ' −2'], ['−1', v => v.replace(/\s*[+−-]\d\b/, '') + ' −1'], ['+2', v => v.replace(/\s*[+−-]\d\b/, '') + ' +2'], ['+3', v => v.replace(/\s*[+−-]\d\b/, '') + ' +3']]
     .map(([l, fn]) => h('button', { onclick: () => setTon(fn) }, l)));
-  const styles = [...new Set([...TON_STYLES, ...tonItems().map(x => x.tarz).filter(Boolean)])];
+  const ex = (S.tonBook.extra = S.tonBook.extra || { styles: [], usuls: [] });
+  cur.usul = usulOf(cur); cur.tarz = tarzOf(cur);
+  // seçmeli düğmeler + "＋" ile kendi tarzını / usulünü ekle (listeye kalıcı eklenir, senkron)
+  const chipRow = (vals, curVal, inp, addKey, norm) => {
+    const row = h('div', { class: 'ton-chips' });
+    const draw = () => row.replaceChildren(...vals().map(v => h('button', { class: inp.value === v ? 'on' : '', onclick: () => { inp.value = inp.value === v ? '' : v; draw(); } }, v)),
+      h('button', { class: 'add-chip', onclick: async () => {
+        const v = norm((await promptText(t('tonNewChip'), '')) || '').trim(); if (!v) return;
+        if (!ex[addKey].includes(v)) { ex[addKey].push(v); S.tonBook.extraUpdated = Date.now(); db.set('tonlar', S.tonBook); scheduleSync(1500); }
+        inp.value = v; draw();
+      } }, '＋'));
+    inp.addEventListener('input', draw); draw();
+    return row;
+  };
+  const usulIn = h('input', { class: 'field', value: cur.usul, placeholder: '9/8' });
+  const usulChips = chipRow(() => [...new Set([...TON_USULS, ...ex.usuls, ...tonItems().map(usulOf).filter(Boolean)])], cur.usul, usulIn, 'usuls', normUsul);
   const tarzIn = h('input', { class: 'field', value: cur.tarz, placeholder: t('tonStyle') });
-  const tarzChips = h('div', { class: 'ton-chips' }, ...styles.map(st => h('button', { class: cur.tarz === st ? 'on' : '', onclick: e => { tarzIn.value = st; for (const b of e.target.parentNode.children) b.classList.toggle('on', b === e.target); } }, st)));
+  const tarzChips = chipRow(() => [...new Set([...TON_STYLES, ...ex.styles, ...tonItems().map(tarzOf).filter(Boolean)])], cur.tarz, tarzIn, 'styles', x => x);
   const bpmIn = h('input', { class: 'field', type: 'number', inputmode: 'numeric', value: cur.bpm, placeholder: 'BPM' });
   let taps = [];
   const tap = h('button', { class: 'btn', onclick: () => { const n = performance.now(); taps = taps.filter(x => n - x < 3000); taps.push(n); if (taps.length > 1) bpmIn.value = Math.round(60000 / ((taps[taps.length - 1] - taps[0]) / (taps.length - 1))); } }, 'TAP');
@@ -1668,7 +1685,7 @@ function tonEdit(it) {
   const sing = h('div', { class: 'ton-tabs small' }, ...SINGERS.map(([k, l]) => h('button', { class: singer === k ? 'on' : '', onclick: e => { singer = k; for (const b of e.target.parentNode.children) b.classList.toggle('on', b === e.target); } }, l)));
   const save = () => {
     const title = titleIn.value.trim(); if (!title) { toast(t('nameRequired')); titleIn.focus(); return; }
-    Object.assign(cur, { title, artist: artistIn.value.trim(), ton: tonIn.value.trim(), tarz: tarzIn.value.trim(), bpm: bpmIn.value.trim(), not: notIn.value.trim(), singer, p: tonLink(title) || cur.p || null });
+    Object.assign(cur, { title, artist: artistIn.value.trim(), ton: tonIn.value.trim(), usul: normUsul(usulIn.value.trim()), tarz: tarzIn.value.trim(), bpm: bpmIn.value.trim(), not: notIn.value.trim(), singer, p: tonLink(title) || cur.p || null });
     saveTon(cur); toast(t('saved')); openTonDefteri();
   };
   modal(
@@ -1677,7 +1694,8 @@ function tonEdit(it) {
     h('label', { class: 'lab' }, t('songName'), ' ', found), titleIn,
     h('label', { class: 'lab' }, t('artist')), artistIn,
     h('label', { class: 'lab' }, t('ton')), tonIn, base, mods,
-    h('label', { class: 'lab' }, t('tonStyle')), tarzChips, tarzIn,
+    h('label', { class: 'lab' }, t('tonUsul')), usulChips,
+    h('label', { class: 'lab' }, t('tonStyle')), tarzChips,
     h('label', { class: 'lab' }, 'BPM'), h('div', { class: 'row' }, bpmIn, tap),
     h('label', { class: 'lab' }, t('shortNote')), notIn,
     h('div', { class: 'btn-row' }, h('button', { class: 'btn primary fix-apply', onclick: save }, '✓ ' + t('save')),
@@ -1923,7 +1941,7 @@ async function sync({ quiet = false } = {}) {
     try {
       const { data: td, sha: tsha } = await g.getJson('tonlar.json');
       const merged = mergeBooks(S.tonBook || emptyBook(), td);
-      if (JSON.stringify(merged) !== JSON.stringify(td ? { format: 1, items: td.items || {} } : null) && Object.keys(merged.items).length)
+      if (JSON.stringify(merged) !== JSON.stringify(td ? { format: 1, items: td.items || {}, extra: { styles: (td.extra || {}).styles || [], usuls: (td.extra || {}).usuls || [] } } : null) && Object.keys(merged.items).length)
         await g.putFile('tonlar.json', new TextEncoder().encode(JSON.stringify(merged, null, 1)), 'Ton defteri güncellendi', tsha || undefined);
       S.tonBook = merged; await db.set('tonlar', merged);
       drawTon();

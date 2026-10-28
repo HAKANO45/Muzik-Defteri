@@ -4,14 +4,22 @@
 
 export const SINGERS = [['eylem', '🎤 Eylem'], ['hakan', '🎤 Hakan'], ['duet', '👥 Düet']];
 export const NOTES = ['Do', 'Re', 'Mi', 'Fa', 'Sol', 'La', 'Si'];
-export const STYLES = ['9-8', 'Slow', 'Pop', 'Rumba', 'Halay', 'Oyun Havası', 'Türkü', 'Arabesk', 'Fantezi', 'Rock'];
+export const USULS = ['2/4', '3/4', '4/4', '5/8', '6/8', '7/8', '9/8', '10/8'];
+export const STYLES = [ 'Slow', 'Pop', 'Rumba', 'Halay', 'Oyun Havası', 'Türkü', 'Arabesk', 'Fantezi', 'Rock'];
 
-export function emptyBook() { return { format: 1, items: {} }; }
+export function emptyBook() { return { format: 1, items: {}, extra: { styles: [], usuls: [] } }; }
+/** "9-8" / "9/8" gibi tarz aslında usuldür → "9/8" */
+export const isUsul = x => /^\s*\d{1,2}\s*[-/]\s*\d{1,2}\s*$/.test(x || '');
+export const normUsul = x => (x || '').replace(/\s+/g, '').replace('-', '/');
+export function usulOf(it) { return it.usul || (isUsul(it.tarz) ? normUsul(it.tarz) : ''); }
+export function tarzOf(it) { return isUsul(it.tarz) ? '' : (it.tarz || ''); }
 export function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
 /** tonlar.json birleştirme: öğe başına son değişen kazanır */
 export function mergeBooks(local, remote) {
-  const out = { format: 1, items: { ...((remote && remote.items) || {}) } };
+  const out = { format: 1, items: { ...((remote && remote.items) || {}) },
+    extra: { styles: [...new Set([...(((remote || {}).extra || {}).styles || []), ...(((local || {}).extra || {}).styles || [])])],
+             usuls: [...new Set([...(((remote || {}).extra || {}).usuls || []), ...(((local || {}).extra || {}).usuls || [])])] } };
   for (const [id, it] of Object.entries((local && local.items) || {})) {
     const r = out.items[id];
     if (!r || (it.updated || 0) > (r.updated || 0)) out.items[id] = it;

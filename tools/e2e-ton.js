@@ -29,6 +29,7 @@ const O = process.env.OUT || '/tmp'; const puts = [];
   await page.click('.ton-add'); await page.waitForTimeout(200);
   await page.fill('.modal-card input.field >> nth=0', 'Sevmenin Zamanı Yok'); await page.waitForTimeout(150);
   await page.locator('.ton-notes button', { hasText: 'Fa' }).click(); await page.locator('.ton-chips button', { hasText: '♯' }).click();
+  await page.locator('.ton-chips button', { hasText: '6/8' }).first().click();
   await page.locator('.ton-chips button', { hasText: 'Slow' }).first().click();
   await page.screenshot({ path: O + '/ton2.png' });
   await page.click('.mh-save'); await page.waitForTimeout(300);
