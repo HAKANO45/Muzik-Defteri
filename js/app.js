@@ -7,7 +7,7 @@ import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, e
 import { t, getLang, setLang } from './i18n.js';
 import { suggest, fixAll, fixName, mostlyUpper, toSentence, tidyBlank } from './turkce.js';
 
-export const VERSION = '5.10.0';
+export const VERSION = '5.10.1';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -300,30 +300,61 @@ function toggleDir(d) {
   try { localStorage.setItem(OPEN_KEY, JSON.stringify([...openDirs])); } catch (_) {}
   const sc = $('list').scrollTop; renderList(); $('list').scrollTop = sc;
 }
+function keepScroll(fn) { const sc = $('list').scrollTop; fn(); $('list').scrollTop = sc; }
 function renderTree(list, dir, level) {
   const { dirs, files } = orderedChildren(dir);
+  const all = [...dirs, ...files];
+  const sorting = !!S.sortMode;
+  // ↕ modunda her satırın yanında büyük ▲▼ (kendi klasörü içinde taşır); masaüstünde fareyle sürükle-bırak da olur
+  const acts = p => h('span', { class: 'acts sort-acts' },
+    h('button', { class: 'sort-btn', onclick: e => { e.stopPropagation(); moveItem(dir, all, p, -1); } }, '▲'),
+    h('button', { class: 'sort-btn', onclick: e => { e.stopPropagation(); moveItem(dir, all, p, 1); } }, '▼'));
+  const dragable = (el, p) => {
+    if (!sorting) return;
+    el.draggable = true;
+    el.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', JSON.stringify({ dir, p })); el.classList.add('dragging'); });
+    el.addEventListener('dragend', () => el.classList.remove('dragging'));
+    el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drop-to'); });
+    el.addEventListener('dragleave', () => el.classList.remove('drop-to'));
+    el.addEventListener('drop', e => {
+      e.preventDefault(); el.classList.remove('drop-to');
+      let m; try { m = JSON.parse(e.dataTransfer.getData('text/plain')); } catch (_) { return; }
+      if (!m || m.dir !== dir || m.p === p) return;
+      const isDir = q => S.dirs.has(q) && !S.songs.has(q);
+      if (isDir(m.p) !== isDir(p)) return;
+      const arr = all.filter(x => x !== m.p); arr.splice(arr.indexOf(p), 0, m.p);
+      S.order.order[dir] = { names: arr.map(baseName), updated: Date.now() };
+      saveOrder(); keepScroll(renderList);
+    });
+  };
   for (const d of dirs) {
     const open = openDirs.has(d);
-    const row = h('div', { class: 'item tree-dir' + (open ? ' open' : ''), role: 'button', tabindex: 0, style: `--lvl:${level}`, 'data-d': d,
+    const row = h('div', { class: 'item tree-dir' + (open ? ' open' : '') + (sorting ? ' sorting' : ''), role: 'button', tabindex: 0, style: `--lvl:${level}`, 'data-d': d,
         onkeydown: e => { if (e.key === 'Enter') toggleDir(d); } },
       h('span', { class: 'chev' }, open ? '▾' : '▸'),
       h('span', { class: 'ico' }, open ? '📂' : '📁'),
       h('span', { class: 'main' }, h('span', { class: 'name' }, showFolder(baseName(d)))),
-      h('span', { class: 'count' }, countIn(d)));
-    addTaps(row, () => toggleDir(d), () => openFolderSheet(d)); addLongPress(row, () => openFolderSheet(d));
+      sorting ? acts(d) : h('span', { class: 'count' }, countIn(d)));
+    if (sorting || S.sel) row.addEventListener('click', e => { if (!e.target.closest('.acts')) toggleDir(d); });
+    else { addTaps(row, () => toggleDir(d), () => openFolderSheet(d)); addLongPress(row, () => openFolderSheet(d)); }
+    dragable(row, d);
     list.append(row);
     if (open) renderTree(list, d, level + 1);
   }
   const ctx = { list: files, label: dir || t('root') };
   const lim = level === 0 ? S.limit : (treeLimit.get(dir) || 200);
   for (const p of files.slice(0, lim)) {
-    const it = songItem(p, { ctx, sub: '', tapMenu: true });
+    let it;
+    if (S.sel) it = selectItem(p);
+    else if (sorting) { it = songItem(p, { ctx, sub: '', acts: acts(p).childNodes }); it.classList.add('sorting'); it.onclick = null; }
+    else it = songItem(p, { ctx, sub: '', tapMenu: true });
     it.classList.add('tree-song'); it.style.setProperty('--lvl', level);
+    dragable(it, p);
     list.append(it);
   }
   if (files.length > lim) list.append(h('button', { class: 'small-btn tree-more', style: `--lvl:${level}`, onclick: () => {
     if (level === 0) S.limit += 300; else treeLimit.set(dir, lim + 300);
-    const sc = $('list').scrollTop; renderList(); $('list').scrollTop = sc; } }, t('showMore', { n: files.length - lim })));
+    keepScroll(renderList); } }, t('showMore', { n: files.length - lim })));
 }
 
 // ------------------------------------------------------------------ sıralama · çoklu seçim · çift dokunuş
@@ -345,7 +376,7 @@ function moveItem(dir, all, p, d) {
   if (isDir(all[i]) !== isDir(all[j])) return;          // klasörler üstte, şarkılar altta kalır
   [all[i], all[j]] = [all[j], all[i]];
   S.order.order[dir] = { names: all.map(baseName), updated: Date.now() };
-  saveOrder(); renderList();
+  saveOrder(); keepScroll(renderList);
 }
 function saveOrder() { S.order.dirty = true; db.set('order', S.order); scheduleSync(); }
 function resetOrder(dir) { S.order.order[dir] = { names: [], updated: Date.now() }; saveOrder(); renderList(); }
@@ -363,7 +394,7 @@ function addTaps(el, single, double) {
 function selectItem(p) {
   const rec = S.songs.get(p); const on = S.sel.has(p);
   return h('div', { class: 'item sel-item' + (on ? ' selected' : ''), role: 'button', tabindex: 0,
-      onclick: () => { on ? S.sel.delete(p) : S.sel.add(p); renderList(); } },
+      onclick: () => { on ? S.sel.delete(p) : S.sel.add(p); keepScroll(renderList); } },
     h('span', { class: 'sel-box' }, on ? '✓' : ''),
     h('span', { class: 'main' }, h('span', { class: 'name' }, rec ? showTitle(rec._title) : baseName(p))));
 }
@@ -529,27 +560,7 @@ function renderList() {
       VIEW_ONLY || !S.dir ? null : h('button', { class: 'small-btn', title: t('renameFolder'), onclick: () => renameFolder(S.dir) }, '✎📁'),
       VIEW_ONLY || !S.dir ? null : h('button', { class: 'small-btn danger-btn', title: t('deleteFolder'), onclick: () => deleteFolder(S.dir) }, '🗑📁')].filter(Boolean));
     const { dirs, files } = orderedChildren(S.dir);
-    const all = [...dirs, ...files];
-    const moveBtns = (p) => S.sortMode ? h('span', { class: 'acts sort-acts' },
-      h('button', { class: 'sort-btn', onclick: e => { e.stopPropagation(); moveItem(S.dir, all, p, -1); } }, '▲'),
-      h('button', { class: 'sort-btn', onclick: e => { e.stopPropagation(); moveItem(S.dir, all, p, 1); } }, '▼')) : null;
-    if (!S.sortMode && !S.sel) { renderTree(list, S.dir, 0); renderEmptyLib(list, dirs, files); return; }
-    for (const d of dirs) {
-      const row = h('div', { class: 'item' + (S.sortMode ? ' sorting' : ''), role: 'button', tabindex: 0,
-          onkeydown: e => { if (e.key === 'Enter') goDir(d); } },
-        h('span', { class: 'ico' }, '📁'),
-        h('span', { class: 'main' }, h('span', { class: 'name' }, showFolder(baseName(d)))),
-        S.sortMode ? moveBtns(d) : h('span', { class: 'count' }, countIn(d)));
-      if (!S.sortMode && !S.sel) { addTaps(row, () => goDir(d), () => openFolderSheet(d)); addLongPress(row, () => openFolderSheet(d)); }
-      list.append(row);
-    }
-    const ctx = { list: files, label: S.dir || t('root') };
-    for (const p of files.slice(0, S.limit)) {
-      if (S.sel) list.append(selectItem(p));
-      else if (S.sortMode) { const it = songItem(p, { ctx, sub: '', acts: moveBtns(p).childNodes }); it.classList.add('sorting'); it.onclick = null; list.append(it); }
-      else { const it = songItem(p, { ctx, sub: '', tapMenu: true }); list.append(it); }
-    }
-    if (files.length > S.limit) list.append(h('button', { class: 'small-btn', style: 'margin:10px', onclick: () => { S.limit += 300; renderList(); } }, t('showMore', { n: files.length - S.limit })));
+    renderTree(list, S.dir, 0);
     renderEmptyLib(list, dirs, files);
     return;
   }
