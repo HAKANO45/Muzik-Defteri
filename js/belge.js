@@ -82,59 +82,89 @@ async function loadPdfjs() {
 export async function parsePdf(buf, fileName) {
   const lib = await loadPdfjs();
   const doc = await lib.getDocument({ data: new Uint8Array(buf), isEvalSupported: false }).promise;
-  const blocks = [];
-  let allSizes = [];
+  const USUL = /^\d{1,2}\s*[-/]\s*\d{1,2}$/;
   const pages = [];
   for (let n = 1; n <= doc.numPages; n++) {
     const page = await doc.getPage(n);
-    const vp = page.getViewport({ scale: 1 });
     const tc = await page.getTextContent();
-    const items = tc.items.filter(it => it.str && it.str.trim()).map(it => {
-      const font = tc.styles[it.fontName] || {};
-      return { s: it.str, x: it.transform[4], y: it.transform[5], w: it.width, size: Math.hypot(it.transform[2], it.transform[3]) || it.height,
-        bold: /bold|black|heavy/i.test((font.fontFamily || '') + ' ' + (it.fontName || '')) };
-    });
-    allSizes = allSizes.concat(items.map(i => Math.round(i.size)));
-    pages.push({ items, W: vp.width });
+    pages.push({ W: page.getViewport({ scale: 1 }).width, items: tc.items.filter(it => it.str && it.str.trim()).map(it => ({
+      s: it.str, x: it.transform[4], y: it.transform[5], w: it.width, size: Math.hypot(it.transform[2], it.transform[3]) || it.height })) });
   }
-  const body = median(allSizes) || 12;
-  for (const { items, W } of pages) {
-    // sütunlar: sayfanın iki yarısında da yazı varsa ikiye böl
-    const mid = W / 2;
-    const left = items.filter(i => i.x < mid - 5), right = items.filter(i => i.x >= mid - 5);
-    const twoCols = left.length >= 2 && right.filter(i => !isPageNo(i.s)).length >= 2;
-    const cols = twoCols ? [left, right] : [items];
-    // satırlar
-    const colLines = cols.map(col => {
+  const docBody = median(pages.flatMap(p => p.items.map(i => Math.round(i.size)))) || 12;
+  const songs = [];
+  let cover = '', cur = null, started = false;
+  for (const { W, items: all } of pages) {
+    // kapak yazısı: belgenin gövde yazısının 2 katından büyük, ilk şarkıdan önce → klasör adı
+    const big = all.filter(i => i.size >= docBody * 2);
+    let items = all;
+    if (!started && big.length) {
+      if (!cover) {
+        // kapak satırları yukarıdan aşağı; tek kelimelik ad ("HAKAN") başka çok kelimeli satır varsa atlanır
+        const cl = [...big].sort((a, b) => b.y - a.y || a.x - b.x).map(i => i.s.trim()).filter(Boolean);
+        const multi = cl.filter(x => x.split(/\s+/).length > 1);
+        cover = (multi.length ? multi : cl).join(' ');
+      }
+      items = all.filter(i => i.size < docBody * 2);
+    }
+    if (!items.length) continue;
+    // sütun sınırı: sayfanın sağ tarafında en az 3 satırın başladığı ilk x
+    let boundary = 0;
+    const xs = [...new Set(items.filter(i => i.x > W * 0.4).map(i => Math.round(i.x)))].sort((a, b) => a - b);
+    for (const x of xs) if (items.filter(i => Math.abs(i.x - x) <= 3).length >= 3) { boundary = x - 4; break; }
+    const cols = boundary ? [items.filter(i => i.x < boundary), items.filter(i => i.x >= boundary)] : [items];
+    const segs = [];
+    cols.forEach((col, ci) => {
+      if (!col.length) return;
       const lines = [];
       for (const it of [...col].sort((a, b) => b.y - a.y || a.x - b.x)) {
-        const L = lines.find(l => Math.abs(l.y - it.y) < Math.max(2, it.size * 0.4));
+        const L = lines.find(l => Math.abs(l.y - it.y) < Math.max(2, it.size * 0.45));
         if (L) L.items.push(it); else lines.push({ y: it.y, items: [it] });
       }
-      return lines.sort((a, b) => b.y - a.y).map(l => {
-        l.items.sort((a, b) => a.x - b.x);
-        let text = '', end = null;
-        for (const it of l.items) { if (end !== null && it.x - end > it.size * 0.25 && !text.endsWith(' ')) text += ' '; text += it.s; end = it.x + it.w; }
-        const size = Math.max(...l.items.map(i => i.size));
-        return { text, y: l.y, size, bold: l.items.every(i => i.bold), gap: 0 };
-      });
-    });
-    // boşluk = boş satır (büyük dikey aralık)
-    for (const lines of colLines) for (let i = 1; i < lines.length; i++) lines[i].gap = lines[i - 1].y - lines[i].y;
-    // okuma sırası: aynı yükseklikte başlayan hücreler satır satır (sol, sağ)
-    const segs = [];
-    colLines.forEach((lines, ci) => {
-      let cur = null;
+      lines.sort((a, b) => b.y - a.y);
       for (const l of lines) {
-        const title = l.text.trim().length < 70 && (l.size >= body * 1.2 || (l.bold && l.size >= body * 1.05));
-        if (title || !cur) { cur = { y: l.y, col: ci, lines: [] }; segs.push(cur); }
-        cur.lines.push({ text: l.text, title, size: l.size, gap: l.gap });
+        l.items.sort((a, b) => a.x - b.x);
+        l.size = Math.max(...l.items.map(i => i.size));
+        const main = l.items.filter(i => i.size >= l.size * 0.75);
+        let text = '', end = null;
+        for (const it of main) { if (end !== null && it.x - end > it.size * 0.2 && !text.endsWith(' ')) text += ' '; text += it.s; end = it.x + it.w; }
+        l.text = text.replace(/\s+$/, ''); l.small = l.items.filter(i => i.size < l.size * 0.75).map(i => i.s.trim()).filter(Boolean);
+      }
+      const body = median(lines.map(l => l.size)) || docBody;
+      const step = median(lines.slice(1).map((l, i) => lines[i].y - l.y).filter(g => g > 0)) || body * 1.25;
+      const isT = l => l.size >= body * 1.08 && l.text.trim().length < 70;
+      let seg = null;
+      for (let i = 0; i < lines.length; i++) {
+        const l = lines[i];
+        if (isPageNo(l.text)) continue;
+        if (isT(l)) {
+          if (seg && seg.title && !seg.lines.length) { seg.title.push(l); continue; }     // çok satırlı başlık
+          seg = { y: l.y, col: ci, title: [l], lines: [] }; segs.push(seg); continue;
+        }
+        if (!seg) { seg = { y: l.y, col: ci, title: null, lines: [] }; segs.push(seg); }
+        if (seg.lines.length && lines[i - 1] && lines[i - 1].y - l.y > step * 1.5) seg.lines.push('');
+        seg.lines.push(l.text);
       }
     });
-    segs.sort((a, b) => (Math.abs(a.y - b.y) < body * 2 ? a.col - b.col : b.y - a.y));
-    for (const s of segs) blocks.push(s.lines.map((l, i) => ({ text: (i && l.gap > l.size * 1.9 ? '\n' : '') + l.text, title: l.title, size: l.size })));
+    // okuma sırası: satır satır (aynı yükseklikteki kutular soldan sağa), sonra aşağı
+    segs.sort((a, b) => (Math.abs(a.y - b.y) < docBody * 3 ? a.col - b.col : b.y - a.y));
+    for (const sg of segs) {
+      if (sg.title) {
+        let title = sg.title.map(l => l.text.trim()).join(' ').replace(/\s+/g, ' ');
+        const smalls = sg.title.flatMap(l => l.small);
+        const usul = smalls.find(x => USUL.test(x));
+        const extra = smalls.filter(x => !USUL.test(x) && !isPageNo(x)).join(' ');
+        if (extra) title += ' (' + extra + ')';
+        if (usul) title = usul.replace(/\s+/g, '').replace('/', '-') + ' ' + title;   // "5-8 Cerrahpaşa" → uygulama 5/8 etiketi takar
+        cur = { title, lines: [] }; songs.push(cur); started = true;
+      }
+      if (cur) { if (!sg.title && cur.lines.length) cur.lines.push(''); cur.lines.push(...sg.lines); }   // başlıksız kutu: önceki şarkının devamı
+    }
   }
-  return splitSongs(blocks, fileName, body);
+  const base = (fileName || '').replace(/\.pdf$/i, '').replace(/_/g, ' ');
+  return {
+    folder: folderFromTitle(cover || base),
+    songs: songs.map(s => ({ title: safeName(s.title), text: clean(s.lines) })).filter(s => s.title && s.text.trim()),
+  };
 }
 
 // ------------------------------------------------------------------ ortak: bloklardan şarkılar
