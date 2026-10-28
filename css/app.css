@@ -516,3 +516,33 @@ mark.fix.guess { background: rgba(224,140,40,.25); color: #f0a040; border-bottom
 .miss-list { display: flex; flex-direction: column; gap: 4px; }
 .miss-row { display: flex; justify-content: space-between; align-items: center; min-height: calc(44px * var(--ui)); padding: 6px 10px; border-radius: 10px; border: 1px solid var(--divider); background: var(--bg); color: var(--text); font-size: calc(15px * var(--ui)); text-align: left; }
 .miss-row b { color: var(--gold2); }
+
+/* 🎼 Ton Defteri */
+.modal.ton-modal .modal-card { max-width: 640px; width: 100%; }
+@media (max-width: 600px) { .modal.ton-modal .modal-card { min-height: 100dvh; border-radius: 0; } }
+.ton-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0; }
+.ton-tabs button { min-height: calc(50px * var(--ui)); border-radius: 12px; border: 2px solid var(--gold-dim); background: var(--soft); color: var(--text); font-weight: 800; font-size: calc(15px * var(--ui)); }
+.ton-tabs button.on { background: var(--gold); color: var(--on-gold); border-color: var(--gold); }
+.ton-tabs.small button { min-height: calc(42px * var(--ui)); }
+.ton-q { font-size: calc(17px * var(--ui)); margin-bottom: 6px; }
+.ton-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.ton-chips button { min-height: calc(38px * var(--ui)); padding: 4px 12px; border-radius: 10px; border: 2px solid var(--divider); background: var(--soft); color: var(--text); font-weight: 700; font-size: calc(14px * var(--ui)); }
+.ton-chips button.on { border-color: var(--gold); color: var(--gold2); }
+.ton-list { max-height: 58dvh; overflow: auto; }
+@media (max-width: 600px) { .ton-list { max-height: none; } }
+.ton-grp { color: var(--gold2); font-weight: 900; letter-spacing: .06em; margin: 12px 4px 4px; font-size: calc(14px * var(--ui)); }
+.ton-row { display: flex; align-items: center; gap: 10px; padding: 10px 6px; border-bottom: 1px solid var(--divider); -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.ton-row .n { flex: 1; min-width: 0; } .ton-row .n b { display: block; font-size: calc(18px * var(--ui)); }
+.ton-row .n small { display: block; opacity: .65; font-size: calc(13px * var(--ui)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ton-st { font-size: calc(12px * var(--ui)); border: 1px solid var(--divider); border-radius: 8px; padding: 3px 7px; opacity: .85; flex: none; }
+.ton-key { min-width: calc(82px * var(--ui)); text-align: center; background: var(--gold); color: var(--on-gold); font-weight: 900; border-radius: 10px; padding: 8px 6px; font-size: calc(17px * var(--ui)); flex: none; }
+.ton-key.mk { background: var(--soft); color: var(--gold2); border: 2px solid var(--gold); }
+.ton-foot { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; margin-top: 10px; position: sticky; bottom: 0; background: var(--bg2, #141414); padding-top: 6px; }
+.ton-foot .btn { min-height: calc(54px * var(--ui)); font-size: calc(17px * var(--ui)); font-weight: 900; }
+.ton-notes { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin: 6px 0; }
+.ton-notes button { min-height: calc(46px * var(--ui)); border-radius: 10px; border: 2px solid var(--gold-dim); background: var(--soft); color: var(--text); font-weight: 900; font-size: calc(15px * var(--ui)); }
+.ton-in { font-size: calc(20px * var(--ui)); font-weight: 800; color: var(--gold2); }
+.ton-found { color: var(--gold2); font-weight: 700; font-size: 13px; }
+.chip.ton-badge { background: var(--gold); color: var(--on-gold); border-color: var(--gold); font-weight: 800; }
+.chip.ton-badge.hakan { background: var(--soft); color: var(--gold2); }
+.chip.ton-badge.duet { background: var(--soft); color: #9fd3ff; border-color: #6aa9d6; }

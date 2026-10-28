@@ -5,9 +5,10 @@ import { bytesToSong, songToBytes, ENC_LABEL, gitBlobSha } from './encoding.js';
 import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
+import { SINGERS, NOTES as TON_NOTES, STYLES as TON_STYLES, emptyBook, newId, mergeBooks, parsePasted } from './tonlar.js';
 import { suggest, fixAll, fixName, mostlyUpper, toSentence, tidyBlank, loadGuesser, key as trKey, trLower } from './turkce.js';
 
-export const VERSION = '5.11.0';
+export const VERSION = '5.12.0';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -1081,7 +1082,7 @@ function renderSong() {
   ].filter(Boolean));
   renderPhoneBar(rec, idx);
   $('songTitle').textContent = showTitle(rec._title);
-  $('songNote').replaceChildren(...noteChips(noteOf(rec.p)),
+  $('songNote').replaceChildren(...noteChips(noteOf(rec.p)), ...tonBadges(rec),
     h('button', { class: 'chip chip-add', title: t('songNote'), onclick: () => openNoteDialog(rec.p) }, noteOf(rec.p) ? '✎' : '＋ ' + t('songNote')));
   const meta = $('songMeta'); meta.replaceChildren();
   const d = dirName(rec.p);
@@ -1548,6 +1549,161 @@ async function fixFolder(d) {
   );
 }
 
+// ------------------------------------------------------------------ 🎼 Ton Defteri (gizli)
+const TON = { singer: 'eylem', tarz: '', az: false, q: '' };
+function tonItems(singer) { return Object.values((S.tonBook || emptyBook()).items).filter(x => !x.deleted && (!singer || x.singer === singer)); }
+function tonLink(title) {
+  const k = fold(title || '').replace(/[^a-z0-9]+/g, '');
+  return (S.titleIndex.get(k) || []).find(p => S.songs.has(p) && !S.songs.get(p).del) || null;
+}
+function tonPath(it) { return (it.p && S.songs.has(it.p) && !S.songs.get(it.p).del) ? it.p : tonLink(it.title); }
+function saveTon(it) {
+  it.updated = Date.now();
+  S.tonBook = S.tonBook || emptyBook(); S.tonBook.items[it.id] = it;
+  db.set('tonlar', S.tonBook); scheduleSync(1500);
+}
+/** Sözlerde: kilit açıkken bu şarkının tonları (Eylem · Re m) */
+function tonBadges(rec) {
+  if (!S.tonOpen || !S.tonBook) return [];
+  const k = fold(rec._title).replace(/[^a-z0-9]+/g, '');
+  return tonItems().filter(it => it.p === rec.p || fold(it.title).replace(/[^a-z0-9]+/g, '') === k)
+    .map(it => h('span', { class: 'chip ton-badge ' + it.singer }, (SINGERS.find(s => s[0] === it.singer) || ['', ''])[1] + ' · ' + (it.ton || '?')));
+}
+/** Gizli giriş: başlığa 2 sn basılı tut */
+function bindTonEntry() {
+  for (const el of document.querySelectorAll('.phone-title, .brand')) {
+    let tm = 0;
+    const start = e => { clearTimeout(tm); tm = setTimeout(() => { S.tonOpen = true; openTonDefteri(); if (S.current && !$('song').hidden) renderSong(); }, 2000); };
+    const stop = () => clearTimeout(tm);
+    el.addEventListener('pointerdown', start); el.addEventListener('pointerup', stop); el.addEventListener('pointerleave', stop); el.addEventListener('pointercancel', stop);
+    el.addEventListener('contextmenu', e => e.preventDefault());
+    el.style.webkitUserSelect = 'none'; el.style.userSelect = 'none'; el.style.webkitTouchCallout = 'none';
+  }
+}
+function openTonDefteri() {
+  modal(h('div', { class: 'ton-wrap', id: 'tonWrap' }));
+  $('modal').classList.add('ton-modal');
+  drawTon();
+}
+function drawTon() {
+  const wrap = $('tonWrap'); if (!wrap) return;
+  const all = tonItems(TON.singer);
+  const q = fold(TON.q.trim());
+  const list = all.filter(it => (!TON.tarz || (it.tarz || '—') === TON.tarz) && (!q || fold([it.title, it.artist, it.ton, it.tarz, it.not].join(' ')).includes(q)));
+  const counts = new Map(); for (const it of all) counts.set(it.tarz || '—', (counts.get(it.tarz || '—') || 0) + 1);
+  const tabs = h('div', { class: 'ton-tabs' }, ...SINGERS.map(([k, l]) => h('button', { class: TON.singer === k ? 'on' : '', onclick: () => { TON.singer = k; TON.tarz = ''; drawTon(); } }, l + ' · ' + tonItems(k).length)));
+  const search = h('input', { class: 'field ton-q', type: 'search', placeholder: '🔎 ' + t('tonSearch'), value: TON.q, oninput: e => { TON.q = e.target.value; drawTonList(); } });
+  const chips = h('div', { class: 'ton-chips' },
+    h('button', { class: !TON.tarz ? 'on' : '', onclick: () => { TON.tarz = ''; drawTon(); } }, t('tonAll') + ' ' + all.length),
+    ...[...counts.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => h('button', { class: TON.tarz === k ? 'on' : '', onclick: () => { TON.tarz = TON.tarz === k ? '' : k; drawTon(); } }, (k === '—' ? t('tonNoStyle') : k) + ' · ' + n)),
+    h('button', { class: 'az' + (TON.az ? ' on' : ''), onclick: () => { TON.az = !TON.az; drawTon(); } }, 'A–Z'));
+  const box = h('div', { class: 'ton-list', id: 'tonList' });
+  wrap.replaceChildren(
+    h('div', { class: 'modal-head ton-head' },
+      h('button', { class: 'mh-btn', onclick: closeModal }, '‹'),
+      h('h2', {}, '🎼 ' + t('tonTitle')),
+      h('button', { class: 'mh-btn', title: t('tonLock'), onclick: () => { S.tonOpen = false; closeModal(); if (S.current && !$('song').hidden) renderSong(); toast('🔒 ' + t('tonLocked')); } }, '🔒')),
+    tabs, search, chips, box,
+    h('div', { class: 'ton-foot' },
+      h('button', { class: 'btn', onclick: () => tonPaste() }, '📋 ' + t('tonPaste')),
+      h('button', { class: 'btn primary ton-add', onclick: () => tonEdit(null) }, '＋ ' + t('tonAdd'))));
+  drawTonList();
+}
+function drawTonList() {
+  const box = $('tonList'); if (!box) return;
+  const q = fold(TON.q.trim());
+  const items = tonItems(TON.singer).filter(it => (!TON.tarz || (it.tarz || '—') === TON.tarz) && (!q || fold([it.title, it.artist, it.ton, it.tarz, it.not].join(' ')).includes(q)));
+  const byName = (a, b) => S.collator.compare(a.title, b.title);
+  const row = it => {
+    const p = tonPath(it);
+    const sub = [it.artist, it.bpm ? it.bpm + ' BPM' : '', it.not, p ? '♪ ' + t('tonHasLyrics') : ''].filter(Boolean).join(' · ');
+    const el = h('div', { class: 'ton-row', role: 'button', tabindex: 0 },
+      h('div', { class: 'n' }, h('b', {}, showTitle(it.title)), sub ? h('small', {}, sub) : ''),
+      it.tarz ? h('span', { class: 'ton-st' }, it.tarz) : '',
+      h('span', { class: 'ton-key' + (/hicaz|uşşak|rast|nihavent|kürdi|hüzzam|saba/i.test(it.ton || '') ? ' mk' : '') }, it.ton || '—'));
+    addTaps(el, () => { if (p) { closeModal(); openSong(p, { list: items.map(tonPath).filter(Boolean), label: '🎼 ' + (SINGERS.find(s => s[0] === TON.singer) || ['', ''])[1] }); } else tonEdit(it); }, () => tonEdit(it));
+    addLongPress(el, () => tonEdit(it));
+    return el;
+  };
+  const out = [];
+  if (TON.az || TON.tarz) out.push(...items.sort(byName).map(row));
+  else {
+    const groups = new Map();
+    for (const it of items) { const g = it.tarz || '—'; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(it); }
+    for (const [g, arr] of [...groups.entries()].sort((a, b) => b[1].length - a[1].length)) {
+      out.push(h('div', { class: 'ton-grp' }, g === '—' ? t('tonNoStyle') : g), ...arr.sort(byName).map(row));
+    }
+  }
+  if (!items.length) out.push(h('p', { class: 'hint', style: 'padding:14px' }, t('tonEmpty')));
+  box.replaceChildren(...out);
+}
+function tonEdit(it) {
+  const isNew = !it;
+  const cur = it ? { ...it } : { id: newId(), singer: TON.singer, title: '', artist: '', ton: '', tarz: '', bpm: '', not: '' };
+  const titleIn = h('input', { class: 'field', value: cur.title, placeholder: t('songName'), autocapitalize: 'words' });
+  const found = h('span', { class: 'ton-found' });
+  const upd = () => { const p = tonLink(titleIn.value); found.textContent = p ? '✓ ' + t('tonFound') : ''; };
+  titleIn.addEventListener('input', upd); upd();
+  const artistIn = h('input', { class: 'field', value: cur.artist, placeholder: t('artist') });
+  const tonIn = h('input', { class: 'field ton-in', value: cur.ton, placeholder: 'Re m · Hicaz Si · Do −2' });
+  const setTon = fn => { tonIn.value = fn(tonIn.value.trim()).replace(/\s+/g, ' ').trim(); };
+  const base = h('div', { class: 'ton-notes' }, ...TON_NOTES.map(n => h('button', { onclick: () => setTon(v => {
+    const rest = v.replace(/\b(Do|Re|Mi|Fa|Sol|La|Si)[#♯b♭]?/i, '').trim();
+    return /hicaz/i.test(rest) ? 'Hicaz ' + n + ' ' + rest.replace(/hicaz/i, '') : n + ' ' + rest;
+  }) }, n)));
+  const mods = h('div', { class: 'ton-chips' }, ...[['♯', v => v.replace(/^((?:Hicaz )?(?:Do|Re|Mi|Fa|Sol|La|Si))[♯♭]?/, '$1♯')], ['♭', v => v.replace(/^((?:Hicaz )?(?:Do|Re|Mi|Fa|Sol|La|Si))[♯♭]?/, '$1♭')],
+    ['m', v => / m\b/.test(v) ? v.replace(/ m\b/, '') : v.replace(/^((?:Hicaz )?(?:Do|Re|Mi|Fa|Sol|La|Si)[♯♭]?)/, '$1 m')],
+    ['Hicaz', v => /hicaz/i.test(v) ? v.replace(/hicaz\s*/i, '') : 'Hicaz ' + v],
+    ['−2', v => v.replace(/\s*[+−-]\d\b/, '') + ' −2'], ['−1', v => v.replace(/\s*[+−-]\d\b/, '') + ' −1'], ['+2', v => v.replace(/\s*[+−-]\d\b/, '') + ' +2'], ['+3', v => v.replace(/\s*[+−-]\d\b/, '') + ' +3']]
+    .map(([l, fn]) => h('button', { onclick: () => setTon(fn) }, l)));
+  const styles = [...new Set([...TON_STYLES, ...tonItems().map(x => x.tarz).filter(Boolean)])];
+  const tarzIn = h('input', { class: 'field', value: cur.tarz, placeholder: t('tonStyle') });
+  const tarzChips = h('div', { class: 'ton-chips' }, ...styles.map(st => h('button', { class: cur.tarz === st ? 'on' : '', onclick: e => { tarzIn.value = st; for (const b of e.target.parentNode.children) b.classList.toggle('on', b === e.target); } }, st)));
+  const bpmIn = h('input', { class: 'field', type: 'number', inputmode: 'numeric', value: cur.bpm, placeholder: 'BPM' });
+  let taps = [];
+  const tap = h('button', { class: 'btn', onclick: () => { const n = performance.now(); taps = taps.filter(x => n - x < 3000); taps.push(n); if (taps.length > 1) bpmIn.value = Math.round(60000 / ((taps[taps.length - 1] - taps[0]) / (taps.length - 1))); } }, 'TAP');
+  const notIn = h('input', { class: 'field', value: cur.not || '', placeholder: t('shortNote') });
+  let singer = cur.singer;
+  const sing = h('div', { class: 'ton-tabs small' }, ...SINGERS.map(([k, l]) => h('button', { class: singer === k ? 'on' : '', onclick: e => { singer = k; for (const b of e.target.parentNode.children) b.classList.toggle('on', b === e.target); } }, l)));
+  const save = () => {
+    const title = titleIn.value.trim(); if (!title) { toast(t('nameRequired')); titleIn.focus(); return; }
+    Object.assign(cur, { title, artist: artistIn.value.trim(), ton: tonIn.value.trim(), tarz: tarzIn.value.trim(), bpm: bpmIn.value.trim(), not: notIn.value.trim(), singer, p: tonLink(title) || cur.p || null });
+    saveTon(cur); toast(t('saved')); openTonDefteri();
+  };
+  modal(
+    h('div', { class: 'modal-head' }, h('button', { class: 'mh-btn', onclick: openTonDefteri }, '‹'), h('h2', {}, (isNew ? '＋ ' : '✎ ') + t('tonTitle')), h('button', { class: 'mh-btn mh-save', onclick: save }, t('save'))),
+    sing,
+    h('label', { class: 'lab' }, t('songName'), ' ', found), titleIn,
+    h('label', { class: 'lab' }, t('artist')), artistIn,
+    h('label', { class: 'lab' }, t('ton')), tonIn, base, mods,
+    h('label', { class: 'lab' }, t('tonStyle')), tarzChips, tarzIn,
+    h('label', { class: 'lab' }, 'BPM'), h('div', { class: 'row' }, bpmIn, tap),
+    h('label', { class: 'lab' }, t('shortNote')), notIn,
+    h('div', { class: 'btn-row' }, h('button', { class: 'btn primary fix-apply', onclick: save }, '✓ ' + t('save')),
+      isNew ? null : h('button', { class: 'btn danger', onclick: async () => { if (await confirmBox(t('tonDelete', { name: cur.title }))) { cur.deleted = true; saveTon(cur); openTonDefteri(); } } }, '🗑 ' + t('delete'))));
+  $('modal').classList.add('ton-modal');
+  if (isNew) titleIn.focus();
+}
+function tonPaste() {
+  const ta = h('textarea', { class: 'field', rows: 8, placeholder: t('tonPasteHelp') });
+  const info = h('p', { class: 'hint' });
+  const upd = () => { const r = parsePasted(ta.value); info.textContent = t('tonPasteFound', { n: r.length }); };
+  ta.addEventListener('input', upd);
+  modal(
+    h('div', { class: 'modal-head' }, h('button', { class: 'mh-btn', onclick: openTonDefteri }, '‹'), h('h2', {}, '📋 ' + t('tonPaste') + ' → ' + (SINGERS.find(s => s[0] === TON.singer) || ['', ''])[1])),
+    h('p', { class: 'hint' }, t('tonPasteHelp')),
+    h('button', { class: 'btn', onclick: async () => { try { ta.value = await navigator.clipboard.readText(); upd(); } catch (_) { ta.focus(); toast(t('pasteManual')); } } }, '📋 ' + t('pasteClipboard')),
+    ta, info,
+    h('div', { class: 'btn-row' }, h('button', { class: 'btn primary fix-apply', onclick: () => {
+      const rows = parsePasted(ta.value); if (!rows.length) return;
+      const have = new Set(tonItems(TON.singer).map(x => fold(x.title)));
+      let n = 0;
+      for (const r of rows) { if (have.has(fold(r.title))) continue; saveTon({ id: newId(), singer: TON.singer, ...r, not: '', p: tonLink(r.title) }); n++; }
+      toast(t('tonAdded', { n })); openTonDefteri();
+    } }, '✓ ' + t('tonImport'))));
+  $('modal').classList.add('ton-modal');
+}
+
 async function saveSong(oldPath, newPath, text) {
   const old = oldPath ? S.songs.get(oldPath) : null;
   const target = S.songs.get(newPath);
@@ -1762,6 +1918,15 @@ async function sync({ quiet = false } = {}) {
       S.notes.dirty = false;
       await db.set('notes', S.notes);
     }
+    // 4a0) 🎼 Ton Defteri (öğe başına birleşim)
+    try {
+      const { data: td, sha: tsha } = await g.getJson('tonlar.json');
+      const merged = mergeBooks(S.tonBook || emptyBook(), td);
+      if (JSON.stringify(merged) !== JSON.stringify(td ? { format: 1, items: td.items || {} } : null) && Object.keys(merged.items).length)
+        await g.putFile('tonlar.json', new TextEncoder().encode(JSON.stringify(merged, null, 1)), 'Ton defteri güncellendi', tsha || undefined);
+      S.tonBook = merged; await db.set('tonlar', merged);
+      if (document.querySelector('.ton-modal')) drawTon();
+    } catch (e) { console.warn('ton defteri', e); }
     // 4a) Kişisel Türkçe harf seçimleri (birleşim)
     try {
       const { data: kd, sha: ksha } = await g.getJson('kisisel-sozluk.json');
@@ -2287,6 +2452,7 @@ function bind() {
   if (!$('btnLink')) $('btnSync').before(h('button', { class: 'icon-btn link-btn', id: 'btnLink', title: t('linkTitle') }, '🔗'));
   if (!$('stageLink') && $('stageClock')) $('stageClock').before(h('span', { class: 'stage-link', id: 'stageLink', hidden: true }, '🔗'));
   $('btnLink').addEventListener('click', openLinkSheet);
+  bindTonEntry();
   linkConnect();
   $('btnPanel').addEventListener('click', () => togglePanel());
   $('unfoldBtn').addEventListener('click', () => setCompact(false));
@@ -2402,6 +2568,7 @@ async function start() {
   try { S.removed = (await db.get('removed')) || {}; } catch (_) {}
   try { const o = await db.get('order'); if (o && o.order) S.order = o; } catch (_) {}
   try { S.pers = (await db.get('pers')) || null; } catch (_) {}
+  try { S.tonBook = (await db.get('tonlar')) || emptyBook(); } catch (_) { S.tonBook = emptyBook(); }
   if (Array.isArray(vdirs)) S.virtualDirs = new Set(vdirs);
   if (settings) S.settings = { ...S.settings, ...settings, gh: { ...S.settings.gh, ...(settings.gh || {}) } };
   if (programs) S.programs = { ...S.programs, ...programs };
@@ -2425,4 +2592,4 @@ async function start() {
 }
 
 start();
-window.__md = S; window.__mdVersion = VERSION; window.__mdGo = d => goDir(d); // hata ayıklama için
+window.__md = S; window.__mdVersion = VERSION; window.__mdGo = d => goDir(d); window.__mdTon = () => { S.tonOpen = true; openTonDefteri(); }; // hata ayıklama için
