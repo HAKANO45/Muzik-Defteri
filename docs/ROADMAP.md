@@ -1,5 +1,8 @@
 # Yol haritası
 
+## v5.12.0 — tamam (önizlemeyle onaylandı)
+- 🎼 Ton Defteri (gizli): başlığa 2 sn basılı tut → Eylem / Hakan / Düet listeleri; tarza göre gruplu (A–Z düğmesi), arama, ton kutusu; ＋ Ekle (ton düğmeleri, tarz, BPM TAP) telefonlarda da; 📋 Excel/E-Tablolar'dan yapıştır; sözü olan şarkıya dokun → açılır; kilit açıkken sözlerde ton rozetleri. `js/tonlar.js`, `tonlar.json` (öğe başına birleşim). İlk veri: Eylem 34 şarkı.
+
 ## v5.11.0 — tamam (önizlemeyle onaylandı)
 - Düzelt 2. katman: bağlama bakan tahminci (meacer/deasciifier, MIT, `js/vendor/deasciifier`) — sözlükte olmayan kelimeler turuncu "tahmin". Toplu düzeltmede sadece ş/ğ/ı içermeyen şarkılarda (hız), tek şarkıda her zaman.
 - Kişisel seçimler: ✕ = bir daha önerilmez, ✓ tahmin = kesin (`kisisel-sozluk.json`, birleşim senkron).

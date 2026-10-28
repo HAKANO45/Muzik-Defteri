@@ -14,6 +14,7 @@ bundle/repertuar.json.gz   uygulamanın indirdiği paket (Action üretir — ell
 programlar.json       programlar (setlist) + favoriler; uygulama yazar
 notlar.json           şarkı notları: solist, ton, kısa not (yol → not); uygulama yazar
 sahne.json            Ortak Sahne oda kodu { oda } (uygulama oluşturur; değişirse cihazlar yeniden bağlanmalı)
+tonlar.json           🎼 Ton Defteri (gizli): { items: { id: {singer: eylem|hakan|duet, title, artist, ton, tarz, bpm, not, p, updated, deleted?} } }; uygulama yazar
 kisisel-sozluk.json   Düzelt'te kullanıcının ✓/✕ seçimleri { acc: {iskelet: doğru}, rej: ["iskelet>öneri"] }; uygulama yazar
 bundle/sozluk.json.gz Türkçe harf sözlüğü (Action, tools/build_sozluk.py)
 siralama.json         kullanıcının klasör içi sırası: { order: { <klasör>: { names:[…], updated } } }; uygulama yazar

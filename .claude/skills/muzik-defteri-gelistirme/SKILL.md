@@ -60,6 +60,8 @@ PDF/Word içe aktar: `js/belge.js` (`parsePdf`, `parseDocx`), UI `importDocument
 
 Düzelt tahminci: `loadGuesser()` (turkce.js) → `suggest/applyFixes(text, lex, skip, pers, useGuess)`; `src: 'lex'|'guess'`. Kişisel seçimler `S.pers` ↔ `kisisel-sozluk.json`.
 
+Ton Defteri: `openTonDefteri`, `drawTon`, `tonEdit`, `tonPaste`, `tonBadges`, `bindTonEntry` (app.js) + `js/tonlar.js`; test `TON=../Muzik-Defteri-Repertuar/tonlar.json node tools/e2e-ton.js`. Not: sözdizimi kontrolü için dosyayı .mjs olarak `node --check` et (.js CJS sanılıyor).
+
 Sıralama: `siralama.json` → klasör başına ad listesi (`orderedChildren`, `moveItem`); sırası olmayanlar alfabetik sona. Liste satırlarında tek dokunuş = aç, çift dokunuş = menü (`addTaps`), basılı tut = menü (`addLongPress`). Çoklu seçim: `S.sel`, `filesCopyMove`, `filesDelete`, `renameSong` (iPhone'da da açık — dosya yönetimi).
 
 Şarkı notları: `notlar.json` → `{ notes: { <yol>: { solist, bpm, ton, style, not, updated, deleted? } } }` — yol başına `updated` ile birleştirilir. Şarkı yeniden adlandırılınca/taşınınca not da taşınır (`replacePathEverywhere`). Toplu taşımada (repertuvar düzenleme) `notlar.json` ve `programlar.json` yolları da güncellenmeli.
