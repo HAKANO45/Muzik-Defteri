@@ -1,5 +1,8 @@
 # Yol haritası
 
+## v5.12.1 — tamam (önizlemeyle onaylandı)
+- Ton Defteri kenar çubuğunda sekme: 🎼 Ton (kilit açıkken görünür, cihazda hatırlanır `md.tonOpen`); dokun → sözler, ‹ › ton listesinin sırasıyla (playlist gibi); 🔒 sekmeyi gizler.
+
 ## v5.12.0 — tamam (önizlemeyle onaylandı)
 - 🎼 Ton Defteri (gizli): başlığa 2 sn basılı tut → Eylem / Hakan / Düet listeleri; tarza göre gruplu (A–Z düğmesi), arama, ton kutusu; ＋ Ekle (ton düğmeleri, tarz, BPM TAP) telefonlarda da; 📋 Excel/E-Tablolar'dan yapıştır; sözü olan şarkıya dokun → açılır; kilit açıkken sözlerde ton rozetleri. `js/tonlar.js`, `tonlar.json` (öğe başına birleşim). İlk veri: Eylem 34 şarkı.
 
