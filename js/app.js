@@ -6,9 +6,9 @@ import { readZip, writeZip } from './zip.js';
 import { fold, titleOf, tagsOf, baseName, dirName, isChordLine, transposeLine, escapeHtml } from './textutil.js';
 import { t, getLang, setLang } from './i18n.js';
 import { SINGERS, NOTES as TON_NOTES, STYLES as TON_STYLES, USULS as TON_USULS, usulOf, tarzOf, normUsul, emptyBook, newId, mergeBooks, parsePasted } from './tonlar.js';
-import { suggest, fixAll, fixName, mostlyUpper, toSentence, tidyBlank, loadGuesser, key as trKey, trLower } from './turkce.js';
+import { suggest, fixAll, fixName, mostlyUpper, toSentence, tidyBlank, loadGuesser, key as trKey, trLower, trUpper } from './turkce.js';
 
-export const VERSION = '5.12.3';
+export const VERSION = '5.13.0';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -1553,6 +1553,210 @@ async function fixFolder(d) {
   );
 }
 
+// ------------------------------------------------------------------ 🧹 Repertuvar Düzenleyici (adım adım, önizlemeli)
+/** Seçilen değişiklikleri tek kayıtla uygula. x: { r, text (null = içerik aynı), np (null = yer aynı) } */
+async function commitSongEdits(sel, message) {
+  const changes = [], prepared = [], used = new Set();
+  for (const x of sel) {
+    let path = x.np || x.r.p;
+    if (x.np && x.np !== x.r.p) {                         // hedefte aynı ad varsa (2), (3)…
+      const dir = dirName(path), stem = baseName(path).replace(/\.txt$/i, '');
+      let i = 2; while ((S.songs.has(path) && !S.songs.get(path).del && path !== x.r.p) || used.has(path)) path = (dir ? dir + '/' : '') + `${stem} (${i++}).txt`;
+    }
+    used.add(path);
+    let bytes = null, enc = x.r.e;
+    if (x.text != null && x.text !== x.r.t) {
+      let e = x.r.e; if (e === 'ascii' && /[^\x00-\x7f]/.test(x.text)) e = 'cp1254';
+      ({ bytes, enc } = songToBytes({ t: x.text, e, n: x.r.n }));
+      changes.push({ path: 'repertuar/' + path, bytes });
+    } else if (path !== x.r.p) changes.push({ path: 'repertuar/' + path, sha: x.r.s, fromP: x.r.p });
+    else continue;
+    if (path !== x.r.p) changes.push({ path: 'repertuar/' + x.r.p, delete: true });
+    prepared.push({ x, bytes, enc, path });
+  }
+  if (!prepared.length) return 0;
+  if (!(await commitFolderChange(prepared.map(p => p.x.r), changes, message))) return 0;
+  const dels = [], map = new Map(), puts = [], ok = gh().ok;
+  for (const { x, bytes, enc, path } of prepared) {
+    const sha = bytes ? await gitBlobSha(bytes) : x.r.s;
+    const nr = decorate({ p: path, t: x.text != null ? x.text : x.r.t, e: enc, n: x.r.n, s: ok ? sha : x.r.s, dirty: !ok, m: Date.now(), ...(ok ? { up: sha, upAt: Date.now() } : {}) });
+    S.songs.set(path, nr); puts.push(strip(nr));
+    if (path !== x.r.p) { S.songs.delete(x.r.p); dels.push(x.r.p); map.set(x.r.p, path); }
+  }
+  await db.putSongs(puts);
+  if (dels.length) { await db.deleteSongs(dels); markRemoved(dels); remapPaths(map); }
+  rebuildIndex(); renderList(); scheduleSync(800);
+  return prepared.length;
+}
+
+const ORG = { extraArtists: (() => { try { return JSON.parse(localStorage.getItem('md.artists') || '[]'); } catch (_) { return []; } })() };
+const artKey = x => fold(x || '').replace(/-\d+$/, '').replace(/[^a-z0-9]/g, '');
+const titleCase = x => x.replace(/-\d+$/, '').split(/\s+/).map(w => w ? trUpper(w[0]) + trLower(w.slice(1)) : w).join(' ');
+/** Tanınan sanatçılar: kökteki Sanatçılar/* adları (asıl yazım) + başka yerdeki "SANATÇILAR" klasörlerinin altındakiler + elle yazılanlar */
+function artistMap() {
+  const m = new Map();
+  for (const p of S.dirs.keys()) if (p.startsWith('Sanatçılar/') && p.split('/').length === 2) m.set(artKey(baseName(p)), baseName(p));
+  for (const p of S.dirs.keys()) {
+    const parts = p.split('/');
+    if (parts.length >= 2 && fold(parts[parts.length - 2]) === 'sanatcilar') { const k = artKey(parts[parts.length - 1]); if (k && !m.has(k)) m.set(k, titleCase(parts[parts.length - 1])); }
+  }
+  for (const a of ORG.extraArtists) if (a.trim()) m.set(fold(a).replace(/[^a-z0-9]/g, ''), a.trim());
+  return m;
+}
+const SITE_RE = /(www\.|https?:\/\/|\.com\b|\.net\b|\.org\b|sarkisozleri|şarkı\s*sözleri|lyrics)/i;
+const KUNYE_RE = /^\s*(söz|müzik|beste|söz\s*[-&/]\s*müzik|yorum|albüm|düzenleme|aranje)\s*[:\-–]/i;
+/** Dosya adı temizliği: baştaki uzun sayı, alt çizgi, "Sanatçı - Ad", Türkçe harf */
+function cleanStem(stem, opt, AM, lex, pers) {
+  let s = stem, artist = '';
+  const A = x => AM.get(artKey(x));
+  if (opt.junk) {
+    s = s.replace(/^\d{6,}[_\s.\-]+/, '').replace(/__([^_]+)_+$/, ' ($1)').replace(/_+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  }
+  // "Sanatçı - Ad", "Ad - Sanatçı", "Sanatçı-Ad": her tireyi dene, bir yanı tanınan sanatçıysa
+  const pre = (s.match(/^\d{1,3}[.\- ]+(?=\D)/) || [''])[0], rest = s.slice(pre.length);
+  for (const mm of rest.matchAll(/\s*[-–]\s*/g)) {
+    const L = rest.slice(0, mm.index).trim(), R = rest.slice(mm.index + mm[0].length).trim();
+    if (!L || !R) continue;
+    const a = A(L) || A(R);
+    if (a) { artist = a; if (opt.artist) s = pre + (A(L) ? R : L); break; }
+  }
+  if (!artist) {                                       // "… ibrahim tatlises" / "CENGIZ KURTOGLU …" (2+ kelimelik ad, tiresiz)
+    const w = rest.split(/\s+/);
+    for (let n = Math.min(3, w.length - 1); n >= 2 && !artist; n--) {
+      const tail = A(w.slice(-n).join(' ')), head = A(w.slice(0, n).join(' '));
+      if (tail) { artist = tail; if (opt.artist) s = pre + w.slice(0, -n).join(' '); }
+      else if (head) { artist = head; if (opt.artist) s = pre + w.slice(n).join(' '); }
+    }
+  }
+  if (opt.turkish && lex) s = fixName(s, lex, pers);
+  s = s.replace(/[\\/:*?"<>|]/g, '').trim();
+  return { stem: s || stem, artist };
+}
+function cleanBody(text, opt) {
+  let lines = text.split('\n'), removed = 0;
+  if (opt.site || opt.kunye) lines = lines.filter(l => { const bad = (opt.site && SITE_RE.test(l)) || (opt.kunye && KUNYE_RE.test(l)); if (bad) removed++; return !bad; });
+  return { text: removed ? tidyBlank(lines.join('\n')) : text, removed };
+}
+
+function openOrganizer() {
+  if (VIEW_ONLY) { toast(t('viewOnly')); return; }
+  const card = (n, title, desc, fn, soon) => h('button', { class: 'org-step' + (soon ? ' soon' : ''), onclick: soon ? null : fn },
+    h('span', { class: 'org-n' }, n), h('span', {}, h('b', {}, title), h('small', {}, desc)));
+  modal(
+    h('div', { class: 'modal-head' }, h('h2', {}, '🧹 ' + t('orgTitle')), h('button', { class: 'mh-btn', onclick: closeModal }, '✕')),
+    h('p', { class: 'hint' }, t('orgHelp')),
+    h('button', { class: 'btn org-backup', onclick: async () => {
+      const g = gh(); if (!g.ok) { toast(t('needOnline')); return; }
+      const d = new Date(), name = `yedek-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`;
+      try { await g.createBranch(name); toast('💾 ' + t('orgBackupDone', { n: name })); } catch (e) { toast(t('syncError', { msg: e.message })); }
+    } }, '💾 ' + t('orgBackup')),
+    card('①', t('orgStep1'), t('orgStep1d'), () => orgNames()),
+    card('②', t('orgStep2'), t('orgStep2d'), () => orgArtists()),
+    card('③', t('orgStep3'), t('orgSoon'), null, true),
+    card('④', t('orgStep4'), t('orgSoon'), null, true));
+}
+
+/** ① Adlar ve gereksiz yazılar */
+async function orgNames() {
+  const lex = await getLexicon(); await guessReady();
+  const pers = persObj(), AM = artistMap();
+  const opt = { junk: true, artist: true, turkish: !!lex, site: true, kunye: false };
+  const box = h('div', { class: 'fix-folder-list' }), info = h('h3', {});
+  let rows = [], scanId = 0;
+  const scan = async () => {
+    const my = ++scanId; rows = []; box.replaceChildren(); let k = 0;
+    const all = visibleSongs();
+    for (const r of all) {
+      if (++k % 300 === 0) { info.textContent = `⏳ ${k} / ${all.length}`; await new Promise(res => setTimeout(res, 0)); if (my !== scanId) return; }
+      const stem = baseName(r.p).replace(/\.txt$/i, '');
+      const c = cleanStem(stem, opt, AM, opt.turkish ? lex : null, pers);
+      const b = cleanBody(r.t, opt);
+      if (c.stem === stem && !b.removed) continue;
+      rows.push({ r, artistCut: !!c.artist && opt.artist, junkCut: /^\d{6,}|_/.test(stem), text: b.removed ? b.text : null, np: c.stem !== stem ? (dirName(r.p) ? dirName(r.p) + '/' : '') + c.stem + '.txt' : null, removed: b.removed, on: true });
+    }
+    const rank = x => x.np && (x.artistCut || x.junkCut) ? 0 : x.np ? 1 : 2;
+    rows.sort((a, b) => rank(a) - rank(b));
+    info.textContent = t('orgFound', { n: rows.length });
+    box.replaceChildren(...rows.slice(0, 500).map(x => {
+      const cb = h('input', { type: 'checkbox', checked: true, onchange: () => { x.on = cb.checked; } });
+      return h('label', { class: 'fix-frow' }, cb, h('span', {},
+        x.np ? h('span', {}, h('s', { class: 'old' }, baseName(x.r.p)), ' → ', h('b', {}, baseName(x.np))) : h('b', {}, baseName(x.r.p)),
+        h('small', {}, dirName(x.r.p) + (x.removed ? ' · ' + t('orgLinesRemoved', { n: x.removed }) : ''))));
+    }));
+    if (rows.length > 500) box.append(h('p', { class: 'hint' }, t('fixMore', { n: rows.length - 500 })));
+  };
+  const chip = (key, label) => h('button', { class: 'chip-opt' + (opt[key] ? ' on' : ''), onclick: e => { opt[key] = !opt[key]; e.currentTarget.classList.toggle('on', opt[key]); scan(); } }, label);
+  const run = async () => {
+    const sel = rows.slice(0, 500).filter(x => x.on); if (!sel.length) return;
+    if (!(await confirmBox(t('orgConfirm', { n: sel.length })))) return;
+    const n = await commitSongEdits(sel, `Düzenleyici ①: ${sel.length} şarkının adı / gereksiz yazıları temizlendi`);
+    if (n) toast(t('orgDone', { n }));
+    orgNames();
+  };
+  modal(
+    h('div', { class: 'modal-head' }, h('button', { class: 'mh-btn', onclick: openOrganizer }, '‹'), h('h2', {}, '① ' + t('orgStep1')), h('button', { class: 'mh-btn', onclick: closeModal }, '✕')),
+    h('div', { class: 'chip-row' }, chip('junk', t('orgOptJunk')), chip('artist', t('orgOptArtist')), lex ? chip('turkish', t('fixTurkish')) : null, chip('site', t('orgOptSite')), chip('kunye', t('orgOptKunye'))),
+    info, box,
+    h('div', { class: 'btn-row' }, h('button', { class: 'btn primary fix-apply', onclick: run }, '✓ ' + t('orgApply')), h('button', { class: 'btn', onclick: closeModal }, t('cancel'))),
+    h('p', { class: 'hint' }, t('orgNote')));
+  scan();
+}
+
+/** ② Sanatçıları topla: "Sanatçı - Ad" adlı ya da sanatçı adlı klasördeki şarkılar → Sanatçılar/Sanatçı/ */
+function orgArtists() {
+  const AM = artistMap();
+  const extraIn = h('input', { class: 'field', value: ORG.extraArtists.join(', '), placeholder: 'Ahmet Kaya, Sezen Aksu, …' });
+  const box = h('div', { class: 'fix-folder-list' }), info = h('h3', {});
+  let groups = [];
+  const scan = () => {
+    const AMx = artistMap(), by = new Map();
+    for (const r of visibleSongs()) {
+      if (r.p.startsWith('Sanatçılar/')) continue;
+      const stem = baseName(r.p).replace(/\.txt$/i, '');
+      let { stem: title, artist } = cleanStem(stem, { junk: true, artist: true }, AMx, null, null);
+      let byFolder = false;                                  // en derindeki sanatçı klasörü önce
+      for (const seg of r.p.split('/').slice(0, -1).reverse()) { const a = AMx.get(artKey(seg)); if (a) { artist = a; byFolder = true; break; } }
+      if (!artist) continue;
+      const d = dirName(r.p);
+      if (!by.has(artist)) by.set(artist, new Map());
+      const src = by.get(artist);
+      if (!src.has(d)) src.set(d, { d, byFolder, list: [], on: byFolder });
+      src.get(d).list.push({ r, np: `Sanatçılar/${artist}/${title}.txt`, text: null });
+    }
+    groups = [...by.entries()].map(([a, src]) => ({ a, src: [...src.values()].sort((x, y) => (y.byFolder - x.byFolder) || y.list.length - x.list.length) }))
+      .sort((x, y) => y.src.reduce((s, v) => s + v.list.length, 0) - x.src.reduce((s, v) => s + v.list.length, 0));
+    const count = () => { const on = groups.flatMap(g => g.src).filter(v => v.on); info.textContent = t('orgArtFound', { n: on.reduce((s, v) => s + v.list.length, 0), m: new Set(groups.filter(g => g.src.some(v => v.on)).map(g => g.a)).size }); };
+    count();
+    box.replaceChildren(...groups.map(g => {
+      const subs = g.src.map(v => {
+        const cb = h('input', { type: 'checkbox', checked: v.on, onchange: () => { v.on = cb.checked; count(); } });
+        v.cb = cb;
+        return h('label', { class: 'org-src' + (v.byFolder ? '' : ' style') }, cb, h('span', {},
+          (v.byFolder ? '📁 ' : '🏷 ') + (v.d || '/') + ' · ' + v.list.length,
+          v.byFolder ? null : h('small', {}, t('orgByName'))));
+      });
+      const all = h('input', { type: 'checkbox', checked: g.src.some(v => v.on), onchange: () => { for (const v of g.src) if (v.byFolder || !all.checked) { v.on = all.checked; v.cb.checked = all.checked; } count(); } });
+      return h('div', { class: 'org-group' }, h('label', { class: 'fix-frow' }, all, h('b', {}, '🎤 ' + g.a + ' · ' + t('songs', { n: g.src.reduce((s, v) => s + v.list.length, 0) }))), ...subs);
+    }));
+  };
+  const run = async () => {
+    const sel = groups.flatMap(g => g.src).filter(v => v.on).flatMap(v => v.list).slice(0, 1500); if (!sel.length) return;
+    if (!(await confirmBox(t('orgArtConfirm', { n: sel.length })))) return;
+    const n = await commitSongEdits(sel, `Düzenleyici ②: ${sel.length} şarkı sanatçı klasörlerine toplandı`);
+    if (n) toast(t('orgDone', { n }));
+    orgArtists();
+  };
+  modal(
+    h('div', { class: 'modal-head' }, h('button', { class: 'mh-btn', onclick: openOrganizer }, '‹'), h('h2', {}, '② ' + t('orgStep2')), h('button', { class: 'mh-btn', onclick: closeModal }, '✕')),
+    h('p', { class: 'hint' }, t('orgArtHelp', { n: AM.size })),
+    h('label', { class: 'lab' }, t('orgExtraArtists')), extraIn,
+    h('button', { class: 'btn', onclick: () => { ORG.extraArtists = extraIn.value.split(',').map(x => x.trim()).filter(Boolean); try { localStorage.setItem('md.artists', JSON.stringify(ORG.extraArtists)); } catch (_) {} scan(); } }, '🔄 ' + t('orgRescan')),
+    info, box,
+    h('div', { class: 'btn-row' }, h('button', { class: 'btn primary fix-apply', onclick: run }, '✓ ' + t('orgArtApply')), h('button', { class: 'btn', onclick: closeModal }, t('cancel'))),
+    h('p', { class: 'hint' }, t('orgNote2')));
+  scan();
+}
+
 // ------------------------------------------------------------------ 🎼 Ton Defteri (gizli)
 const TON = { singer: 'eylem', tarz: '', az: false, q: '' };
 function tonItems(singer) { return Object.values((S.tonBook || emptyBook()).items).filter(x => !x.deleted && (!singer || x.singer === singer)); }
@@ -2258,6 +2462,7 @@ async function openSettings() {
       h('h2', {}, '⚙ ' + t('settings')),
       h('button', { class: 'mh-btn', title: t('close'), onclick: async () => { if (await readGh()) { closeModal(); toast(t('settingsSaved')); } } }, '✕')),
     h('div', { class: 'btn-row' }, h('button', { class: 'btn primary', onclick: () => { closeModal(); openAppearance(); } }, '🎨 ' + t('appearance')),
+      VIEW_ONLY ? null : h('button', { class: 'btn ton-set', onclick: () => openOrganizer() }, '🧹 ' + t('orgTitle')),
       S.tonOpen ? h('button', { class: 'btn ton-set', onclick: () => { closeModal(); lockTon(); } }, '🔒 ' + t('tonHide'))
                 : h('button', { class: 'btn ton-set', onclick: () => { openTonDefteri(); } }, '🎼 ' + t('tonShow'))),
     h('label', {}, t('language')), langSel,

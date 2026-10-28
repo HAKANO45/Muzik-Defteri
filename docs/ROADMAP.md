@@ -151,3 +151,5 @@
 - Kopya şarkıları birleştirme aracı
 - .doc / .pptx dosyalarını metne çevirme
 - Klasörleri yeniden adlandırma / taşıma
+
+- 5.13.0 — 🧹 Repertuvar Düzenleyici (Ayarlar): yedek dal, ① adlar/gereksiz yazılar (sayı, alt çizgi, sanatçı adı, Türkçe harf, site/künye satırları), ② sanatçıları Sanatçılar/<Ad>/ altında topla (klasör bazlı işaretli, addan bulunanlar elle). ③ kopyalar, ④ bölümler sırada.

@@ -92,6 +92,14 @@ export class GitHub {
     }
   }
 
+  /** Yedek dal: şu anki son kaydın kopyası (geri dönmek için). */
+  async createBranch(name) {
+    const api = `${API}/repos/${this.owner}/${this.repo}/git`;
+    const ref = await (await this.call('GET', `${api}/ref/heads/${encodeURIComponent(this.branch)}`)).json();
+    await this.call('POST', `${api}/refs`, { body: { ref: 'refs/heads/' + name, sha: ref.object.sha } });
+    return name;
+  }
+
   /**
    * Çok dosyalı tek commit (Git Data API). Klasör taşıma/silme için: içerik yeniden yüklenmez,
    * var olan blob sha'ları yeni yola bağlanır. changes: [{ path, sha }] | [{ path, bytes }] | [{ path, delete: true }]

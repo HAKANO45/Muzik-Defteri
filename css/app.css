@@ -562,3 +562,15 @@ mark.fix.guess { background: rgba(224,140,40,.25); color: #f0a040; border-bottom
 .ton-chips .add-chip { border-style: dashed; border-color: var(--gold); color: var(--gold2); min-width: 44px; font-size: 18px; }
 .btn.ton-set { border-color: var(--gold); color: var(--gold2); font-weight: 800; }
 @media (min-width: 601px) { .tabs.five { flex-wrap: wrap; } .tabs.five button { flex: 1 1 auto; } }
+
+/* 🧹 Düzenleyici */
+.org-step { display: flex; gap: 12px; align-items: center; width: 100%; text-align: left; padding: 12px; margin: 8px 0; border-radius: 14px; border: 2px solid var(--gold-dim); background: var(--soft); color: var(--text); }
+.org-step b { display: block; font-size: calc(17px * var(--ui)); } .org-step small { display: block; opacity: .7; font-size: calc(13px * var(--ui)); }
+.org-step .org-n { font-size: 26px; color: var(--gold2); flex: none; }
+.org-step.soon { opacity: .45; }
+.org-backup { width: 100%; border-color: var(--gold); color: var(--gold2); font-weight: 800; }
+.fix-frow s.old { opacity: .55; }
+.org-group { border-bottom: 1px solid var(--gold-dim); padding-bottom: 6px; }
+.org-src { display: flex; gap: 10px; align-items: center; padding: 6px 0 6px 34px; font-size: calc(15px * var(--ui)); }
+.org-src small { display: block; opacity: .65; } .org-src.style { opacity: .85; }
+.org-src input, .org-group .fix-frow input { width: 24px; height: 24px; flex: none; }
