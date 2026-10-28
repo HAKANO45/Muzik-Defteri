@@ -1,5 +1,9 @@
 # Yol haritası
 
+## v5.12.2 — tamam (önizlemeyle onaylandı)
+- Ton Defteri: Usul satırı (2/4 3/4 4/4 5/8 6/8 7/8 9/8 10/8), ＋ ile kendi usul/tarz düğmesini ekleme (`tonlar.json` → `extra`, senkron); eski "9-8" tarzı 9/8 usulü sayılır; rozet usul gösterir.
+- Ayarlar'da "🎼 Ton Defteri'ni aç / gizle" düğmesi (basılı tutma Mac'te zor). Masaüstünde 5 sekme iki satır.
+
 ## v5.12.1 — tamam (önizlemeyle onaylandı)
 - Ton Defteri kenar çubuğunda sekme: 🎼 Ton (kilit açıkken görünür, cihazda hatırlanır `md.tonOpen`); dokun → sözler, ‹ › ton listesinin sırasıyla (playlist gibi); 🔒 sekmeyi gizler.
 
