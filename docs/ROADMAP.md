@@ -1,5 +1,10 @@
 # Yol haritası
 
+## v5.11.0 — tamam (önizlemeyle onaylandı)
+- Düzelt 2. katman: bağlama bakan tahminci (meacer/deasciifier, MIT, `js/vendor/deasciifier`) — sözlükte olmayan kelimeler turuncu "tahmin". Toplu düzeltmede sadece ş/ğ/ı içermeyen şarkılarda (hız), tek şarkıda her zaman.
+- Kişisel seçimler: ✕ = bir daha önerilmez, ✓ tahmin = kesin (`kisisel-sozluk.json`, birleşim senkron).
+- Ayarlar: "Türkçe harfi eksik görünen şarkılar" sayacı + klasör listesi → toplu düzelt. Klasör taraması parça parça (UI donmaz).
+
 ## v5.10.2 — tamam (önizlemeyle onaylandı)
 - Sürükle-bırak ile klasöre taşıma (Mac/Windows): şarkıyı ya da ☑ seçilenlerin hepsini bir klasör satırının veya "Repertuvar" yazısının üstüne bırak → onay → tek commit (`dropMove`, `dropTarget`, sürüklenenler bellekte: Safari).
 
