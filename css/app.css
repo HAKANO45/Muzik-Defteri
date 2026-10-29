@@ -621,3 +621,13 @@ mark.fix.guess { background: rgba(224,140,40,.25); color: #f0a040; border-bottom
 /* ＋☰ her listede */
 .plus-prog { min-width: 56px; min-height: 46px; margin-left: 6px; border: 2px solid var(--gold); border-radius: 12px; background: transparent; color: var(--gold2); font-size: calc(17px * var(--ui)); font-weight: 800; cursor: pointer; flex: none; }
 .plus-prog.rm { border-color: var(--gold-dim); color: var(--text); opacity: .75; min-width: 46px; }
+
+/* 🏷 not penceresi: dokunarak seçim */
+.note-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 6px; }
+.note-chips .nc { min-height: 46px; min-width: 52px; padding: 0 14px; border: 2px solid var(--gold); border-radius: 23px; background: transparent; color: var(--gold2); font-weight: 800; font-size: calc(17px * var(--ui)); cursor: pointer; }
+.note-chips .nc.on { background: var(--gold); color: #111; }
+.note-chips .nc.add { border-color: var(--gold-dim); color: var(--text); }
+.note-chips input.nc-new { width: 150px; min-height: 46px; }
+.note-hint { font-size: calc(13px * var(--ui)); opacity: .7; margin-top: -2px; }
+.note-modal label.nl { display: block; color: var(--gold); font-weight: 800; margin: 12px 0 4px; }
+.chip-usul, .chip-makam, .chip-org { border-color: var(--gold-dim); }

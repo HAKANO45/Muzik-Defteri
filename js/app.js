@@ -8,7 +8,7 @@ import { t, getLang, setLang } from './i18n.js';
 import { SINGERS, NOTES as TON_NOTES, STYLES as TON_STYLES, USULS as TON_USULS, usulOf, tarzOf, normUsul, emptyBook, newId, mergeBooks, parsePasted } from './tonlar.js';
 import { suggest, fixAll, fixName, mostlyUpper, toSentence, tidyBlank, loadGuesser, key as trKey, trLower, trUpper } from './turkce.js';
 
-export const VERSION = '5.15.1';
+export const VERSION = '5.16.0';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -194,18 +194,24 @@ function renderTabs() {
 const NOTES = ['Do', 'Do#', 'Re', 'Mi♭', 'Mi', 'Fa', 'Fa#', 'Sol', 'Sol#', 'La', 'Si♭', 'Si'];
 /** Ton gösterimi: nota büyük harf + minör küçük "m" → LAm, REm, FA#m, SI♭ (kullanıcı tercihi). */
 function tonLabel(ton) { const m = /^(.*?)(m?)$/.exec(ton || ''); return m ? m[1].toUpperCase() + m[2] : ton; }
-function noteOf(p) { const n = S.notes.notes[p]; return n && !n.deleted && (n.solist || n.ton || n.not || n.bpm || n.style) ? n : null; }
+function noteOf(p) { const n = S.notes.notes[p]; return n && !n.deleted && (n.solist || n.ton || n.not || n.bpm || n.style || n.usul || n.makam || n.org) ? n : null; }
+const NOTE_MAKAMS = ['Hicaz', 'Uşşak', 'Nihavend', 'Rast', 'Kürdi', 'Hüzzam', 'Segah', 'Hüseyni', 'Karcığar', 'Muhayyer'];
+function noteUsuls() { return [...new Set([...TON_USULS, ...((S.tonBook && S.tonBook.extra && S.tonBook.extra.usuls) || []), ...((S.notes.extra && S.notes.extra.usuls) || [])])]; }
+function noteMakams() { return [...new Set([...NOTE_MAKAMS, ...((S.notes.extra && S.notes.extra.makams) || [])])]; }
 function noteChips(n, small) {
   if (!n) return [];
   return [
     n.solist ? h('span', { class: 'chip chip-solist' + (small ? ' sm' : '') }, '🎤 ' + n.solist) : null,
     n.ton ? h('span', { class: 'chip chip-ton' + (small ? ' sm' : '') }, '🎵 ' + tonLabel(n.ton)) : null,
+    n.usul ? h('span', { class: 'chip chip-usul' + (small ? ' sm' : '') }, '🥁 ' + n.usul) : null,
+    n.makam ? h('span', { class: 'chip chip-makam' + (small ? ' sm' : '') }, '🎶 ' + n.makam) : null,
+    n.org && !small ? h('span', { class: 'chip chip-org' }, '🎹 ' + n.org) : null,
     n.bpm ? h('span', { class: 'chip chip-bpm' + (small ? ' sm' : '') }, 'BPM ' + n.bpm) : null,
-    n.style && !small ? h('span', { class: 'chip chip-style' }, '🥁 ' + n.style) : null,
+    n.style && !small ? h('span', { class: 'chip chip-style' }, '♫ ' + n.style) : null,
     n.not && !small ? h('span', { class: 'chip chip-not' }, n.not) : null,
   ].filter(Boolean);
 }
-function noteSearchText(p) { const n = noteOf(p); return n ? fold([n.solist, n.ton, n.not, n.style, n.bpm ? n.bpm + ' bpm' : ''].filter(Boolean).join(' ')) : ''; }
+function noteSearchText(p) { const n = noteOf(p); return n ? fold([n.solist, n.ton, n.not, n.style, n.usul, n.makam, n.org, n.bpm ? n.bpm + ' bpm' : ''].filter(Boolean).join(' ')) : ''; }
 function allSolists() {
   const c = new Map();
   for (const n of Object.values(S.notes.notes)) if (n && !n.deleted && n.solist) for (const s of n.solist.split(/\s*[&,+\/]\s*/)) if (s) c.set(s, (c.get(s) || 0) + 1);
@@ -216,6 +222,7 @@ function saveNotes() { S.notes.dirty = true; db.set('notes', S.notes); scheduleS
 /** Not penceresi: Solist, Ton, kısa not. iPhone'da açılmaz (sadece görüntüleme). */
 function openNoteDialog(p) {
   const cur = S.notes.notes[p] || {};
+  const rec = S.songs.get(p);
   const solistIn = h('input', { class: 'field', value: cur.solist || '', placeholder: 'Eylem, Hakan, Eylem & Hakan…', list: 'solistList', autocapitalize: 'words' });
   const dl = h('datalist', { id: 'solistList' }, allSolists().map(s => h('option', { value: s })));
   const quick = h('div', { class: 'chip-row' }, ...allSolists().slice(0, 8).map(s =>
@@ -223,10 +230,29 @@ function openNoteDialog(p) {
       const v = solistIn.value.trim();
       solistIn.value = !v ? s : v.split(/\s*&\s*/).includes(s) ? v : v + ' & ' + s;
     } }, s)));
-  const m = /^(.*?)(\s*m)?$/.exec(cur.ton || '');
-  const tonSel = h('select', { class: 'field' }, h('option', { value: '' }, '—'), ...NOTES.map(n => h('option', { value: n, selected: m && m[1] === n }, tonLabel(n))));
-  const minor = h('input', { type: 'checkbox', checked: !!(m && m[2]) });
+  /** Dokunarak tek seçim (tekrar dokun = kaldır); add: kendi seçeneğini ekle */
+  const pick = (list, val, label, add) => {
+    const st = { v: val || '' }, row = h('div', { class: 'note-chips' });
+    const draw = () => row.replaceChildren(...list().map(x => h('button', { class: 'nc' + (x === st.v ? ' on' : ''), onclick: () => { st.v = st.v === x ? '' : x; draw(); } }, label ? label(x) : x)),
+      ...(add ? [h('button', { class: 'nc add', onclick: e => {
+        const inp = h('input', { class: 'field nc-new', placeholder: '…' });
+        const ok = () => { const nv = inp.value.trim(); if (nv) { add(nv); st.v = nv; } draw(); };
+        inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); ok(); } });
+        e.currentTarget.replaceWith(inp, h('button', { class: 'nc on', onclick: ok }, '✓')); inp.focus();
+      } }, '＋')] : []));
+    draw(); return { row, get: () => st.v };
+  };
+  const addExtra = (k, v) => { S.notes.extra = S.notes.extra || {}; S.notes.extra[k] = [...new Set([...(S.notes.extra[k] || []), v])]; };
+  // usul: notta yoksa klasör / ad etiketinden (2/4, 9/8 …) hazır gelir
+  const sugUsul = !cur.usul && rec ? (rec._tags || []).map(x => normUsul(x)).find(x => /^\d{1,2}\/\d{1,2}$/.test(x)) : '';
+  const usul = pick(noteUsuls, cur.usul || sugUsul, null, v => addExtra('usuls', normUsul(v)));
+  const makam = pick(noteMakams, cur.makam, null, v => addExtra('makams', v));
+  const m = /^(.*?)(m?)$/.exec(cur.ton || '');
+  const ton = pick(() => NOTES, m ? m[1] : '', tonLabel);
+  let minorOn = !!(m && m[2]);
+  const minorBtn = h('button', { class: 'nc' + (minorOn ? ' on' : ''), onclick: () => { minorOn = !minorOn; minorBtn.classList.toggle('on', minorOn); } }, 'm (minör)');
   const notIn = h('input', { class: 'field', value: cur.not || '', placeholder: t('notePlaceholder'), maxlength: 80 });
+  const orgIn = h('input', { class: 'field', value: cur.org || '', placeholder: t('orgPlaceholder'), maxlength: 40 });
   const bpmIn = h('input', { class: 'field', type: 'number', inputmode: 'numeric', min: 30, max: 300, value: cur.bpm || '', placeholder: '96' });
   // Tap tempo: ritimde 4+ kez dokun → BPM
   let taps = [];
@@ -239,26 +265,37 @@ function openNoteDialog(p) {
     }
     tapBtn.textContent = 'TAP ' + '•'.repeat(Math.min(taps.length, 8));
   } }, 'TAP');
-  const styles = [...new Set(Object.values(S.notes.notes).filter(n => n && !n.deleted && n.style).map(n => n.style))].sort();
+  // style: en çok kullandıkların düğme; yazmak da olur
+  const sc = new Map(); for (const n of Object.values(S.notes.notes)) if (n && !n.deleted && n.style) sc.set(n.style, (sc.get(n.style) || 0) + 1);
+  const styles = [...sc.entries()].sort((a, b) => b[1] - a[1]).map(x => x[0]);
   const styleIn = h('input', { class: 'field', value: cur.style || '', placeholder: '8Beat Pop, Arabesk 2, Halay…', list: 'styleList', autocapitalize: 'words' });
   const sdl = h('datalist', { id: 'styleList' }, styles.map(s => h('option', { value: s })));
+  const styleRow = h('div', { class: 'note-chips' }, ...styles.slice(0, 8).map(x => h('button', { class: 'nc' + (x === cur.style ? ' on' : ''), onclick: e => {
+    styleIn.value = styleIn.value === x ? '' : x; for (const b of styleRow.children) b.classList.toggle('on', b.textContent === styleIn.value);
+  } }, x)));
   const save = () => {
-    const ton = tonSel.value ? tonSel.value + (minor.checked ? 'm' : '') : '';
-    const solist = solistIn.value.replace(/\s+/g, ' ').trim(), not = notIn.value.trim(), style = styleIn.value.replace(/\s+/g, ' ').trim();
+    const tv = ton.get(), tonV = tv ? tv + (minorOn ? 'm' : '') : '';
+    const solist = solistIn.value.replace(/\s+/g, ' ').trim(), not = notIn.value.trim(), style = styleIn.value.replace(/\s+/g, ' ').trim(), org = orgIn.value.trim();
+    const usulV = usul.get(), makamV = makam.get();
     let bpm = parseInt(bpmIn.value, 10); bpm = bpm >= 20 && bpm <= 400 ? bpm : 0;
-    S.notes.notes[p] = solist || ton || not || bpm || style ? { solist, bpm, ton, style, not, updated: Date.now() } : { deleted: true, updated: Date.now() };
+    const any = solist || tonV || not || bpm || style || usulV || makamV || org;
+    S.notes.notes[p] = any ? { solist, bpm, ton: tonV, style, not, ...(usulV ? { usul: usulV } : {}), ...(makamV ? { makam: makamV } : {}), ...(org ? { org } : {}), updated: Date.now() } : { deleted: true, updated: Date.now() };
     saveNotes(); closeModal(); renderSong(); if (!$('stage').hidden) renderStage(); renderList();
     toast(t('saved'));
   };
-  modal(h('h2', {}, '🏷 ' + t('songNote')),
-    h('label', {}, t('solist')), solistIn, dl, quick,
+  const L = txt => h('label', { class: 'nl' }, txt);
+  modal(h('h2', {}, '🏷 ' + t('songNote') + (rec ? ' · ' + showTitle(rec._title) : '')),
+    L(t('solist')), solistIn, dl, quick,
+    L('🥁 ' + t('usul')), usul.row, sugUsul ? h('div', { class: 'note-hint' }, t('usulFromFolder')) : null,
+    L('🎼 ' + t('ton')), ton.row, h('div', { class: 'note-chips' }, minorBtn),
+    L('🎶 ' + t('makam')), makam.row,
     h('div', { class: 'grid3' },
-      h('div', {}, h('label', {}, 'BPM'), h('div', { class: 'ton-row' }, bpmIn, tapBtn)),
-      h('div', {}, h('label', {}, t('ton')), h('div', { class: 'ton-row' }, tonSel, h('label', { class: 'toggle' }, minor, h('span', {}, 'm'))))),
-    h('label', {}, 'Style'), styleIn, sdl,
-    h('label', {}, t('shortNote')), notIn,
+      h('div', {}, L('BPM'), h('div', { class: 'ton-row' }, bpmIn, tapBtn)),
+      h('div', {}, L('🎹 ' + t('orgReg')), orgIn)),
+    L('Style'), styleRow, styleIn, sdl,
+    L(t('shortNote')), notIn,
     h('div', { class: 'btn-row' }, h('button', { class: 'btn primary', onclick: save }, t('save')), h('button', { class: 'btn', onclick: closeModal }, t('cancel'))));
-  setTimeout(() => solistIn.focus(), 30);
+  $('modal').classList.add('note-modal');
 }
 
 function mergeNotes(local, remote) {
@@ -268,7 +305,8 @@ function mergeNotes(local, remote) {
     if (!out[p] && !n.deleted && S.songs.size && !S.songs.has(p)) continue;
     if (!out[p] || (n.updated || 0) > (out[p].updated || 0)) out[p] = n;
   }
-  return { format: 1, notes: out };
+  const ex = k => [...new Set([...(((remote || {}).extra || {})[k] || []), ...(((local || {}).extra || {})[k] || [])])];
+  return { format: 1, notes: out, extra: { usuls: ex('usuls'), makams: ex('makams') } };
 }
 
 function songItem(p, { sub, html, acts, ctx, tapMenu, plus, extra } = {}) {
@@ -2381,7 +2419,7 @@ async function sync({ quiet = false } = {}) {
     {
       const { data: nd, sha: nsha } = await g.getJson('notlar.json');
       const mergedN = mergeNotes(S.notes, nd);
-      const changedN = JSON.stringify(mergedN.notes) !== JSON.stringify((nd && nd.notes) || {});
+      const changedN = JSON.stringify(mergedN.notes) !== JSON.stringify((nd && nd.notes) || {}) || JSON.stringify(mergedN.extra) !== JSON.stringify((nd && nd.extra) || { usuls: [], makams: [] });
       S.notes = mergedN;
       if (changedN) await g.putFile('notlar.json', new TextEncoder().encode(JSON.stringify(mergedN, null, 1)), 'Şarkı notları güncellendi', nsha || undefined);
       S.notes.dirty = false;
@@ -2645,7 +2683,7 @@ function exportZip() {
 }
 
 // ------------------------------------------------------------------ modal yardımcıları
-function modal(...kids) { $('modal').classList.remove('sheet'); $('modalCard').replaceChildren(...kids.filter(Boolean)); $('modal').hidden = false; }
+function modal(...kids) { $('modal').classList.remove('sheet', 'note-modal'); $('modalCard').replaceChildren(...kids.filter(Boolean)); $('modal').hidden = false; }
 function closeModal() { $('modal').hidden = true; $('modal').onclick = null; $('modal').classList.remove('sheet'); $('modalCard').replaceChildren(); }
 function promptText(title, value) {
   return new Promise(res => {

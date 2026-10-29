@@ -160,3 +160,4 @@
 - 5.14.3 — PDF/Word içe aktarma: 'Sıra numarası ekle (01. 02. …)' (varsayılan açık) → şarkılar her cihazda, GitHub'da ve bilgisayar klasöründe PDF sırasıyla; numara listede görünmez.
 - 5.15.0 — ＋☰ Programa ekle: şarkı menüsünde, sağ tık menüsünde ve ☑ seçimde (klasörler dahil); pencere açık kalır, dokun = ekle ✓ / tekrar = çıkar. Programlar tarzlara göre gruplu (Slow, Halay, THM …, kendi tarzın); programın menüsünde 'Tarzını değiştir'.
 - 5.15.1 — ＋☰ Programa ekle düğmesi arama sonuçlarında, favorilerde, son açılanlarda ve program listesinde; sağ tık / basılı tut menüsü bu listelerde de (Programa ekle en üstte). Son açılanlar: satırda ✕ (listeden çıkar) ve 'Listeyi temizle' (şarkılar silinmez).
+- 5.16.0 — 🏷 Not penceresi: Usul (2/4…10/8 + kendi), Ton büyük düğmeler + m, Makam (Hicaz, Uşşak … + kendi), Org kaydı (Ketron), son kullanılan style düğmeleri; usul klasör adından hazır gelir; aramada usul/makam/org da bulunur.
