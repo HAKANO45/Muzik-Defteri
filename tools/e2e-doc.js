@@ -31,6 +31,7 @@ const blobs = [], trees = [], commits = [];
   console.log('klasör', await page.$$eval('.doc-folder', e => e.map(x => x.value)), 'şarkı', titles);
   await page.locator('.doc-song').nth(0).locator('.small-btn').click();
   await page.screenshot({ path: O + '/d1.png' });
+  await page.screenshot({ path: O + '/d0.png' });
   await page.click('.fix-apply'); await page.waitForTimeout(2500);
   console.log('commit', commits, 'blob', blobs.length, 'yollar', trees.flatMap(t => t.tree).map(e => e.path).slice(0, 7));
   console.log('sıra', JSON.stringify(await page.evaluate(() => window.__md.order.order[window.__md.dir])));

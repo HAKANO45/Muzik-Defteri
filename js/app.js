@@ -8,7 +8,7 @@ import { t, getLang, setLang } from './i18n.js';
 import { SINGERS, NOTES as TON_NOTES, STYLES as TON_STYLES, USULS as TON_USULS, usulOf, tarzOf, normUsul, emptyBook, newId, mergeBooks, parsePasted } from './tonlar.js';
 import { suggest, fixAll, fixName, mostlyUpper, toSentence, tidyBlank, loadGuesser, key as trKey, trLower, trUpper } from './turkce.js';
 
-export const VERSION = '5.14.2';
+export const VERSION = '5.14.3';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -2495,14 +2495,21 @@ async function importDocuments(files) {
       h('div', { class: 'doc-fname' }, '📄 ' + d.name + ' · ' + t('songs', { n: d.songs.length })),
       h('label', { class: 'lab' }, '📁 ' + t('folder')), fIn, list));
   }
+  let numbered = true;
+  const numCb = h('input', { type: 'checkbox', checked: true, onchange: () => { numbered = numCb.checked; } });
+  body.prepend(h('label', { class: 'doc-num' }, numCb, h('span', {}, h('b', {}, t('docNumber')), h('small', {}, t('docNumberHelp')))));
   recount();
   const save = async () => {
     const changes = [], add = [], orders = new Map();
-    const used = new Set();
+    const used = new Set(), nextNo = new Map();
+    // sıra numarası: klasörde zaten "07." gibi numaralı şarkı varsa devamından başlar
+    const startNo = dir => { if (!nextNo.has(dir)) { let m = 0; const node = S.dirs.get(dir); for (const f of (node ? node.files : [])) { const k = baseName(f).match(/^(\d{1,3})\s*[.)\-_]/); if (k) m = Math.max(m, +k[1]); } nextNo.set(dir, m + 1); } const n = nextNo.get(dir); nextNo.set(dir, n + 1); return n; };
     for (const d of docs) {
       const dir = d.folder.split('/').map(x => x.replace(/[\\:*?"<>|]/g, '').trim()).filter(Boolean).join('/');
+      const total = d.songs.filter(x => x.on).length;
       for (const x of d.songs.filter(x => x.on)) {
-        const name = x.title.replace(/[\\/:*?"<>|]/g, '').trim(); if (!name) continue;
+        let name = x.title.replace(/[\\/:*?"<>|]/g, '').trim(); if (!name) continue;
+        if (numbered) name = String(startNo(dir)).padStart(total > 99 ? 3 : 2, '0') + '. ' + name.replace(/^\d{1,3}\s*[.)\-_]\s*(?=\D)/, '');
         let p = (dir ? dir + '/' : '') + name + '.txt', i = 2;
         while ((S.songs.has(p) && !S.songs.get(p).del) || used.has(p)) p = (dir ? dir + '/' : '') + `${name} (${i++}).txt`;
         used.add(p);

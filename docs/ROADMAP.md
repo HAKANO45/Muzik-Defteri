@@ -157,3 +157,4 @@
 - 5.14.0 — 📋 Windows gibi: sağ tık / basılı tut menüsü (Kes, Kopyala, Yapıştır, Yeniden adlandır, Sil), panodaki öğe için klasörlerde 📥 ve alt şerit, Ctrl+X/C/V, Entf, F2, Ctrl+tık seçim; klasör de sürüklenip başka klasöre bırakılır; yapıştırınca ağaçta kalır.
 - 5.14.1 — Taşı/Kopyala penceresi: düz uzun liste yerine ana klasörler ağaç gibi (▸ ile içi açılır, ada dokun = seç); arama yazınca düz liste.
 - 5.14.2 — ☑ seçimde klasörler de seçilir (içindeki bütün şarkılarla); birden fazla klasör + şarkı birlikte kopyalanır / taşınır / kesilir / silinir.
+- 5.14.3 — PDF/Word içe aktarma: 'Sıra numarası ekle (01. 02. …)' (varsayılan açık) → şarkılar her cihazda, GitHub'da ve bilgisayar klasöründe PDF sırasıyla; numara listede görünmez.
