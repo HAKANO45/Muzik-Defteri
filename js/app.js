@@ -8,7 +8,7 @@ import { t, getLang, setLang } from './i18n.js';
 import { SINGERS, NOTES as TON_NOTES, STYLES as TON_STYLES, USULS as TON_USULS, usulOf, tarzOf, normUsul, emptyBook, newId, mergeBooks, parsePasted } from './tonlar.js';
 import { suggest, fixAll, fixName, mostlyUpper, toSentence, tidyBlank, loadGuesser, key as trKey, trLower, trUpper } from './turkce.js';
 
-export const VERSION = '5.13.0';
+export const VERSION = '5.13.1';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -415,6 +415,16 @@ function moveItem(dir, all, p, d) {
   S.order.order[dir] = { names: all.map(baseName), updated: Date.now() };
   saveOrder(); keepScroll(renderList);
 }
+/** Ad değişince yerinde kalsın: üst klasörün sırasında eski adın yerine yeni ad (sıra yoksa şu anki görünüş sabitlenir) */
+function keepPlace(oldP, newP, isDir) {
+  const dir = dirName(oldP); if (dir !== dirName(newP)) return;
+  const cur = orderedChildren(dir), all = [...cur.dirs, ...cur.files].map(baseName);
+  const i = all.indexOf(baseName(oldP)); if (i < 0) return;
+  all[i] = baseName(newP);
+  S.order.order[dir] = { names: all, updated: Date.now() };
+  if (isDir) for (const k of Object.keys(S.order.order)) if (k === oldP || k.startsWith(oldP + '/')) { S.order.order[newP + k.slice(oldP.length)] = { ...S.order.order[k], updated: Date.now() }; delete S.order.order[k]; }
+  saveOrder();
+}
 function saveOrder() { S.order.dirty = true; db.set('order', S.order); scheduleSync(); }
 function resetOrder(dir) { S.order.order[dir] = { names: [], updated: Date.now() }; saveOrder(); renderList(); }
 
@@ -546,8 +556,7 @@ async function renameSong(p) {
   const nr = decorate({ p: np, t: rec.t, e: rec.e, n: rec.n, s: rec.s, dirty: gh().ok ? false : rec.dirty, m: Date.now(), ...(gh().ok && rec.s ? { up: rec.s, upAt: Date.now() } : {}) });
   S.songs.set(np, nr); S.songs.delete(p);
   await db.deleteSongs([p]); await db.putSongs([strip(nr)]); markRemoved([p]);
-  // kendi sırasında yerini koru
-  const o = S.order.order[dirName(p)]; if (o && o.names) { const i = o.names.indexOf(baseName(p)); if (i >= 0) { o.names[i] = baseName(np); o.updated = Date.now(); saveOrder(); } }
+  keepPlace(p, np, false);                                 // kendi sırasında yerini koru
   remapPaths(new Map([[p, np]]));
   S.sel = null; rebuildIndex(); renderList(); scheduleSync(800);
   if (S.current === np && $('editor').hidden) renderSong();
@@ -887,6 +896,8 @@ async function moveFolderTo(d, nd) {
     changes.push({ path: 'repertuar/' + b, sha: r.s, fromP: a }, { path: 'repertuar/' + a, delete: true });
   }
   if (songs.length && !(await commitFolderChange(songs, changes, `Klasör: ${d} → ${nd}`))) return;
+  const sameParent = dirName(d) === dirName(nd);
+  if (sameParent) keepPlace(d, nd, true);                     // yeniden adlandırma: yerinde kalsın
   // yerel uygula
   const puts = [], dels = [];
   for (const [a, b] of moves) {
@@ -901,7 +912,10 @@ async function moveFolderTo(d, nd) {
   if (!songs.length) S.virtualDirs.add(nd);
   await saveVirtualDirs();
   remapPaths(new Map(moves));
-  rebuildIndex(); goDir(nd); scheduleSync(800);
+  if (sameParent) { for (const x of [...openDirs]) if (x === d || x.startsWith(d + '/')) { openDirs.delete(x); openDirs.add(nd + x.slice(d.length)); } try { localStorage.setItem(OPEN_KEY, JSON.stringify([...openDirs])); } catch (_) {} }
+  rebuildIndex();
+  if (sameParent) { if (S.dir === d || S.dir.startsWith(d + '/')) S.dir = nd + S.dir.slice(d.length); keepScroll(renderList); } else goDir(nd);
+  scheduleSync(800);
   toast(t('folderRenamed', { n: songs.length }));
   if (S.current && $('editor').hidden) renderSong();
 }
