@@ -8,7 +8,7 @@ import { t, getLang, setLang } from './i18n.js';
 import { SINGERS, NOTES as TON_NOTES, STYLES as TON_STYLES, USULS as TON_USULS, usulOf, tarzOf, normUsul, emptyBook, newId, mergeBooks, parsePasted } from './tonlar.js';
 import { suggest, fixAll, fixName, mostlyUpper, toSentence, tidyBlank, loadGuesser, key as trKey, trLower, trUpper } from './turkce.js';
 
-export const VERSION = '5.15.0';
+export const VERSION = '5.15.1';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -271,7 +271,7 @@ function mergeNotes(local, remote) {
   return { format: 1, notes: out };
 }
 
-function songItem(p, { sub, html, acts, ctx, tapMenu } = {}) {
+function songItem(p, { sub, html, acts, ctx, tapMenu, plus, extra } = {}) {
   const rec = S.songs.get(p);
   const missing = !rec || rec.del;
   const title = missing ? baseName(p).replace(/\.txt$/i, '') + ' ' + t('missingSong') : showTitle(rec._title);
@@ -282,7 +282,11 @@ function songItem(p, { sub, html, acts, ctx, tapMenu } = {}) {
       onkeydown: e => { if (e.key === 'Enter' && !missing) openSong(p, ctx); } },
     h('span', { class: 'ico' }, rec && rec.dirty ? '✱' : '♪'),
     h('span', { class: 'main' }, h('span', { class: 'name' }, title, ...tags, ...noteChips(missing ? null : noteOf(p), true)), subEl),
-    acts ? h('span', { class: 'acts' }, ...acts) : null);
+    acts || ((plus || extra) && !missing && !VIEW_ONLY) ? h('span', { class: 'acts' }, ...(acts || []),
+      ...(plus && !missing && !VIEW_ONLY ? [h('button', { class: 'plus-prog', title: t('addToProgram'), onclick: e => { e.stopPropagation(); addToProgramDialog(p); } }, '＋☰')] : []),
+      ...(extra || [])) : null);
+  // arama, favoriler, son açılanlar, program: sağ tık / basılı tut → aynı menü (programa ekle dahil)
+  if (!tapMenu && !missing && !VIEW_ONLY && !acts) addLongPress(el, e => ctxMenu(p, false, e));
   if (tapMenu && !missing) {
     addTaps(el, () => openSong(p, ctx), () => openSongSheetList(p, ctx));
     addLongPress(el, e => VIEW_ONLY ? openSongSheetList(p, ctx) : ctxMenu(p, false, e));
@@ -611,7 +615,7 @@ function renderList() {
     const ctx = { list: res.map(r => r.p), label: '“' + q + '”' };
     for (const r of res.slice(0, S.limit)) {
       const rec = S.songs.get(r.p);
-      list.append(songItem(r.p, { ctx, html: r.score < 2 ? snippet(rec, q, r.score === 1.5) : null }));
+      list.append(songItem(r.p, { ctx, plus: true, html: r.score < 2 ? snippet(rec, q, r.score === 1.5) : null }));
     }
     if (res.length > S.limit) list.append(h('button', { class: 'small-btn', style: 'margin:10px', onclick: () => { S.limit += 300; renderList(); } }, t('showMore', { n: res.length - S.limit })));
     return;
@@ -652,14 +656,21 @@ function renderList() {
     const fav = S.programs.fav;
     head.append(t('songs', { n: fav.length }));
     const ctx = { list: fav, label: t('favorites') };
-    for (const p of fav) list.append(songItem(p, { ctx }));
+    for (const p of fav) list.append(songItem(p, { ctx, plus: true }));
     if (!fav.length) list.append(h('div', { class: 'list-note' }, '☆'));
     return;
   }
 
   if (S.tab === 'recent') {
     const ctx = { list: S.recent, label: t('recent') };
-    for (const p of S.recent) list.append(songItem(p, { ctx }));
+    head.append(t('songs', { n: S.recent.length }), h('span', { class: 'spacer' }),
+      S.recent.length ? h('button', { class: 'small-btn danger-btn', onclick: async () => {
+        if (!(await confirmBox(t('recentClearConfirm')))) return;
+        S.recent = []; db.set('recent', S.recent); renderList();
+      } }, '🗑 ' + t('recentClear')) : null);
+    for (const p of S.recent) list.append(songItem(p, { ctx, plus: true, extra: [h('button', { class: 'plus-prog rm', title: t('recentRemove'), onclick: e => {
+      e.stopPropagation(); S.recent = S.recent.filter(x => x !== p); db.set('recent', S.recent); keepScroll(renderList); } }, '✕')] }));
+    if (!S.recent.length) list.append(h('div', { class: 'list-note' }, t('recentEmpty')));
     return;
   }
 
@@ -724,7 +735,7 @@ function renderList() {
         h('button', { class: 'sort-btn danger', title: t('remove'), onclick: e => { e.stopPropagation(); prog.items.splice(i, 1); touchProgram(prog); } }, '✕'),
       ] });
       it.classList.add('sorting'); it.onclick = null; list.append(it);
-    } else list.append(songItem(p, { ctx, sub: `${i + 1}. ${dirName(p)}` }));
+    } else list.append(songItem(p, { ctx, plus: true, sub: `${i + 1}. ${dirName(p)}` }));
   });
   if (!prog.items.length) list.append(h('div', { class: 'list-note' }, t('emptyProgram')));
 }
@@ -862,10 +873,10 @@ function ctxMenu(p, isDir, e) {
     h('span', {}, ico + ' ' + label), key ? h('small', {}, key) : null);
   const m = h('div', { class: 'ctx-menu' + (e && e.touch ? ' touch' : ''), id: 'ctxMenu', onclick: ev => ev.stopPropagation() },
     h('div', { class: 'ctx-title' }, (isDir ? '📁 ' : '♪ ') + (items.length > 1 ? t('songs', { n: items.length }) : baseName(p).replace(/\.txt$/i, ''))),
+    !isDir ? b('＋☰', t('addToProgram'), '', () => addToProgramDialog(items.filter(x => S.songs.has(x)))) : null,
     b('✂', t('cut'), 'Ctrl+X', () => clipSet('cut', items)),
     b('⧉', t('copy'), 'Ctrl+C', () => clipSet('copy', items)),
     b('📥', CLIP ? t('pasteInto', { d: target ? baseName(target) : t('root') }) : t('paste'), 'Ctrl+V', () => pasteInto(target), '', !CLIP),
-    !isDir ? b('＋☰', t('addToProgram'), '', () => addToProgramDialog(items.filter(x => S.songs.has(x)))) : null,
     items.length === 1 ? b('✎', t('rename'), 'F2', () => isDir ? renameFolder(p) : renameSong(p)) : null,
     isDir ? b('＋📁', t('newFolderInside'), '', () => newFolder(p)) : null,
     b('🗑', t('delete'), 'Entf', () => deleteItems(items), 'danger'),

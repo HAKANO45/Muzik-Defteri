@@ -617,3 +617,7 @@ mark.fix.guess { background: rgba(224,140,40,.25); color: #f0a040; border-bottom
 .sheet-act.prog-add { border-color: var(--gold); color: var(--gold2); }
 .prog-tarz { margin: 6px 0 10px; }
 .tarz-new { width: 180px; min-height: 44px; display: inline-block; }
+
+/* ＋☰ her listede */
+.plus-prog { min-width: 56px; min-height: 46px; margin-left: 6px; border: 2px solid var(--gold); border-radius: 12px; background: transparent; color: var(--gold2); font-size: calc(17px * var(--ui)); font-weight: 800; cursor: pointer; flex: none; }
+.plus-prog.rm { border-color: var(--gold-dim); color: var(--text); opacity: .75; min-width: 46px; }
