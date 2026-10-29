@@ -154,3 +154,4 @@
 
 - 5.13.0 — 🧹 Repertuvar Düzenleyici (Ayarlar): yedek dal, ① adlar/gereksiz yazılar (sayı, alt çizgi, sanatçı adı, Türkçe harf, site/künye satırları), ② sanatçıları Sanatçılar/<Ad>/ altında topla (klasör bazlı işaretli, addan bulunanlar elle). ③ kopyalar, ④ bölümler sırada.
 - 5.13.1 — Yeniden adlandırılan klasör/şarkı listede yerinde kalır (en alta gitmez); açık klasörler açık kalır.
+- 5.14.0 — 📋 Windows gibi: sağ tık / basılı tut menüsü (Kes, Kopyala, Yapıştır, Yeniden adlandır, Sil), panodaki öğe için klasörlerde 📥 ve alt şerit, Ctrl+X/C/V, Entf, F2, Ctrl+tık seçim; klasör de sürüklenip başka klasöre bırakılır; yapıştırınca ağaçta kalır.

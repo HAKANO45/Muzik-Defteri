@@ -8,7 +8,7 @@ import { t, getLang, setLang } from './i18n.js';
 import { SINGERS, NOTES as TON_NOTES, STYLES as TON_STYLES, USULS as TON_USULS, usulOf, tarzOf, normUsul, emptyBook, newId, mergeBooks, parsePasted } from './tonlar.js';
 import { suggest, fixAll, fixName, mostlyUpper, toSentence, tidyBlank, loadGuesser, key as trKey, trLower, trUpper } from './turkce.js';
 
-export const VERSION = '5.13.1';
+export const VERSION = '5.14.0';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -283,7 +283,12 @@ function songItem(p, { sub, html, acts, ctx, tapMenu } = {}) {
     h('span', { class: 'ico' }, rec && rec.dirty ? '✱' : '♪'),
     h('span', { class: 'main' }, h('span', { class: 'name' }, title, ...tags, ...noteChips(missing ? null : noteOf(p), true)), subEl),
     acts ? h('span', { class: 'acts' }, ...acts) : null);
-  if (tapMenu && !missing) { addTaps(el, () => openSong(p, ctx), () => openSongSheetList(p, ctx)); addLongPress(el, () => openSongSheetList(p, ctx)); }
+  if (tapMenu && !missing) {
+    addTaps(el, () => openSong(p, ctx), () => openSongSheetList(p, ctx));
+    addLongPress(el, e => VIEW_ONLY ? openSongSheetList(p, ctx) : ctxMenu(p, false, e));
+    el.addEventListener('click', e => { FOCUS_P = p; if ((e.ctrlKey || e.metaKey) && !VIEW_ONLY) { e.stopImmediatePropagation(); S.sel = new Set([p]); renderList(); } }, true);
+  }
+  if (CLIP && CLIP.kind === 'cut' && CLIP.items.includes(p)) el.classList.add('clip-cut');
   return el;
 }
 
@@ -304,7 +309,7 @@ function toggleDir(d) {
   const sc = $('list').scrollTop; renderList(); $('list').scrollTop = sc;
 }
 /** Sürükle-bırak ile taşıma (Mac/Windows): şarkıyı (☑ seçiliyse seçilenlerin hepsini) bir klasörün üstüne bırak. */
-let DRAG_SONGS = null;   // Safari özel veri türlerini her zaman taşımadığı için sürüklenenler bellekte tutulur
+let DRAG_SONGS = null, DRAG_DIR = null;   // Safari özel veri türlerini her zaman taşımadığı için sürüklenenler bellekte tutulur
 function dropMove(el, p) {
   if (VIEW_ONLY) return;
   const isSong = S.songs.has(p);
@@ -321,13 +326,24 @@ function dropMove(el, p) {
     el.addEventListener('dragend', () => { el.classList.remove('dragging'); document.documentElement.classList.remove('dragging-songs'); setTimeout(() => { DRAG_SONGS = null; }, 50); });
     return;
   }
+  // klasör de sürüklenir: başka klasörün üstüne bırak → içine taşınır
+  el.draggable = true;
+  el.addEventListener('dragstart', e => { e.stopPropagation(); DRAG_DIR = p; e.dataTransfer.setData('text/plain', '📁 ' + baseName(p)); e.dataTransfer.effectAllowed = 'move'; el.classList.add('dragging'); });
+  el.addEventListener('dragend', () => { el.classList.remove('dragging'); setTimeout(() => { DRAG_DIR = null; }, 50); });
   dropTarget(el, p);
 }
 function dropTarget(el, dir) {
-  el.addEventListener('dragover', e => { if (DRAG_SONGS) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; el.classList.add('drop-in'); } });
+  el.addEventListener('dragover', e => { if (DRAG_SONGS || (DRAG_DIR && DRAG_DIR !== dir && !dir.startsWith(DRAG_DIR + '/') && dirName(DRAG_DIR) !== dir)) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; el.classList.add('drop-in'); } });
   el.addEventListener('dragleave', () => el.classList.remove('drop-in'));
   el.addEventListener('drop', async e => {
     el.classList.remove('drop-in');
+    if (DRAG_DIR) {
+      const d = DRAG_DIR; DRAG_DIR = null; e.preventDefault(); e.stopPropagation();
+      if (d === dir || dir.startsWith(d + '/') || dirName(d) === dir) return;
+      if (!(await confirmBox(t('dropDirConfirm', { a: baseName(d), d: dir ? baseName(dir) : t('root') })))) return;
+      await moveFolderTo(d, uniqueDir(dir, baseName(d)), true);
+      return;
+    }
     if (!DRAG_SONGS) return;
     e.preventDefault(); e.stopPropagation();
     const paths = DRAG_SONGS.filter(x => dirName(x) !== dir); DRAG_SONGS = null;
@@ -373,7 +389,13 @@ function renderTree(list, dir, level) {
       h('span', { class: 'main' }, h('span', { class: 'name' }, showFolder(baseName(d)))),
       sorting ? acts(d) : h('span', { class: 'count' }, countIn(d)));
     if (sorting || S.sel) row.addEventListener('click', e => { if (!e.target.closest('.acts')) toggleDir(d); });
-    else { addTaps(row, () => toggleDir(d), () => openFolderSheet(d)); addLongPress(row, () => openFolderSheet(d)); }
+    else {
+      addTaps(row, () => toggleDir(d), () => openFolderSheet(d));
+      addLongPress(row, e => VIEW_ONLY ? openFolderSheet(d) : ctxMenu(d, true, e));
+      row.addEventListener('click', () => { FOCUS_P = d; }, true);
+      if (CLIP && !VIEW_ONLY && !CLIP.items.some(x => d === x || d.startsWith(x + '/'))) row.append(h('button', { class: 'paste-here', title: t('pasteHere'), onclick: e => { e.stopPropagation(); pasteInto(d); } }, '📥'));
+    }
+    if (CLIP && CLIP.kind === 'cut' && CLIP.items.includes(d)) row.classList.add('clip-cut');
     dragable(row, d);
     list.append(row);
     if (open) renderTree(list, d, level + 1);
@@ -494,7 +516,7 @@ function uniquePath(dir, name) {
 }
 
 /** Çoklu kopyala / taşı: hedef klasörü listeden seç; tek commit, içerik yeniden yüklenmez */
-async function filesCopyMove(paths, kind, to) {
+async function filesCopyMove(paths, kind, to, stay) {
   paths = paths.filter(p => S.songs.has(p));
   if (!paths.length) return;
   const target = to !== undefined ? to : await pickFolder(t(kind === 'copy' ? 'copyFilesTo' : 'moveFilesTo', { n: paths.length }), null);
@@ -526,7 +548,7 @@ async function filesCopyMove(paths, kind, to) {
   }
   if (dels.length) { await db.deleteSongs(dels); markRemoved(dels); remapPaths(new Map(pairs)); }
   await db.putSongs(puts);
-  S.sel = null; rebuildIndex(); goDir(target); scheduleSync(800);
+  S.sel = null; rebuildIndex(); if (stay) { openTo(target); keepScroll(renderList); } else goDir(target); scheduleSync(800);
   toast(t(kind === 'copy' ? 'filesCopied' : 'filesMoved', { n: pairs.length }));
 }
 
@@ -608,6 +630,7 @@ function renderList() {
     const { dirs, files } = orderedChildren(S.dir);
     renderTree(list, S.dir, 0);
     renderEmptyLib(list, dirs, files);
+    clipBar(list);
     return;
   }
 
@@ -744,12 +767,98 @@ function openProgramSheet(pr) {
   $('modal').classList.add('sheet');
 }
 
+// ------------------------------------------------------------------ 📋 Windows gibi: kes · kopyala · yapıştır · sil (aynı ekranda)
+let CLIP = null, FOCUS_P = null;          // CLIP: { kind: 'cut'|'copy', items: [yol] }
+const isDirP = p => !S.songs.has(p) && (S.dirs.has(p) || S.virtualDirs.has(p));
+function uniqueDir(target, name) {
+  const base = (target ? target + '/' : '') + name; let nd = base, i = 2;
+  while (S.dirs.has(nd) || S.virtualDirs.has(nd)) nd = `${base} (${i++})`;
+  return nd;
+}
+function openTo(d) {                      // hedef klasör ağaçta açık görünsün
+  if (!d) return;
+  const parts = d.split('/'); for (let i = 1; i <= parts.length; i++) openDirs.add(parts.slice(0, i).join('/'));
+  try { localStorage.setItem(OPEN_KEY, JSON.stringify([...openDirs])); } catch (_) {}
+}
+function itemsFor(p) { return S.sel && S.sel.has(p) ? [...S.sel] : [p]; }
+function clipSet(kind, items) {
+  if (VIEW_ONLY || !items.length) return;
+  CLIP = { kind, items };
+  const n = items.reduce((s, p) => s + (isDirP(p) ? countIn(p) : 1), 0);
+  toast((kind === 'cut' ? '✂ ' : '⧉ ') + t('clipToast', { n }));
+  S.sel = null; keepScroll(renderList);
+}
+async function pasteInto(target) {
+  if (!CLIP || VIEW_ONLY) return;
+  const { kind, items } = CLIP, move = kind === 'cut';
+  const songs = items.filter(p => S.songs.has(p)), dirs = items.filter(isDirP);
+  for (const d of dirs) {
+    if (target === d || target.startsWith(d + '/')) { toast(t('folderIntoItself')); continue; }
+    if (move) { if (dirName(d) !== target) await moveFolderTo(d, uniqueDir(target, baseName(d)), true); }
+    else await copyFolder(d, target);
+  }
+  if (songs.length) await filesCopyMove(songs, move ? 'move' : 'copy', target, true);
+  if (move) CLIP = null;
+  openTo(target); keepScroll(renderList);
+}
+function deleteItems(items) {
+  const songs = items.filter(p => S.songs.has(p)), dirs = items.filter(isDirP);
+  if (dirs.length === 1 && !songs.length) return deleteFolder(dirs[0]);
+  if (songs.length) return filesDelete(songs);
+}
+/** Sağ tık (PC) / basılı tut (dokunmatik): küçük menü, büyük yazılı */
+function ctxMenu(p, isDir, e) {
+  closeCtx();
+  const items = itemsFor(p), target = isDir ? p : dirName(p);
+  const b = (ico, label, key, fn, cls = '', dis = false) => h('button', { class: 'ctx-act ' + cls, disabled: dis, onclick: ev => { ev.stopPropagation(); closeCtx(); fn(); } },
+    h('span', {}, ico + ' ' + label), key ? h('small', {}, key) : null);
+  const m = h('div', { class: 'ctx-menu' + (e && e.touch ? ' touch' : ''), id: 'ctxMenu', onclick: ev => ev.stopPropagation() },
+    h('div', { class: 'ctx-title' }, (isDir ? '📁 ' : '♪ ') + (items.length > 1 ? t('songs', { n: items.length }) : baseName(p).replace(/\.txt$/i, ''))),
+    b('✂', t('cut'), 'Ctrl+X', () => clipSet('cut', items)),
+    b('⧉', t('copy'), 'Ctrl+C', () => clipSet('copy', items)),
+    b('📥', CLIP ? t('pasteInto', { d: target ? baseName(target) : t('root') }) : t('paste'), 'Ctrl+V', () => pasteInto(target), '', !CLIP),
+    items.length === 1 ? b('✎', t('rename'), 'F2', () => isDir ? renameFolder(p) : renameSong(p)) : null,
+    isDir ? b('＋📁', t('newFolderInside'), '', () => newFolder(p)) : null,
+    b('🗑', t('delete'), 'Entf', () => deleteItems(items), 'danger'),
+    b('⋯', t('more'), '', () => isDir ? openFolderSheet(p) : openSongSheetList(p, {})));
+  document.body.append(m);
+  if (e && !e.touch && e.clientX != null) {
+    const r = m.getBoundingClientRect();
+    m.style.left = Math.min(e.clientX, innerWidth - r.width - 8) + 'px';
+    m.style.top = Math.max(8, Math.min(e.clientY, innerHeight - r.height - 8)) + 'px';
+  }
+  setTimeout(() => document.addEventListener('click', closeCtx, { once: true }), 0);
+}
+function closeCtx() { const m = document.getElementById('ctxMenu'); if (m) m.remove(); }
+function clipBar(list) {
+  if (!CLIP || VIEW_ONLY || S.tab !== 'library') return;
+  const n = CLIP.items.reduce((s, p) => s + (isDirP(p) ? countIn(p) : 1), 0);
+  const first = CLIP.items[0], name = CLIP.items.length === 1 ? baseName(first).replace(/\.txt$/i, '') : t('songs', { n: CLIP.items.length });
+  list.append(h('div', { class: 'clip-bar' },
+    h('span', {}, (CLIP.kind === 'cut' ? '✂ ' : '⧉ ') + t('clipBar', { name, n })),
+    h('button', { onclick: () => pasteInto(S.dir) }, '📥 ' + (S.dir ? baseName(S.dir) : t('root'))),
+    h('button', { onclick: () => { CLIP = null; keepScroll(renderList); } }, '✕')));
+}
+document.addEventListener('keydown', e => {
+  if (VIEW_ONLY || S.tab !== 'library' || document.querySelector('#modal:not([hidden])')) return;
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
+  if (/INPUT|TEXTAREA|SELECT/.test(tag) || (document.activeElement && document.activeElement.isContentEditable)) return;
+  if (!$('editor').hidden) return;
+  const p = FOCUS_P && (S.songs.has(FOCUS_P) || isDirP(FOCUS_P)) ? FOCUS_P : null;
+  const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+  if (e.key === 'Escape') { closeCtx(); return; }
+  if (mod && (k === 'x' || k === 'c') && p) { if (String(window.getSelection())) return; e.preventDefault(); clipSet(k === 'x' ? 'cut' : 'copy', itemsFor(p)); }
+  else if (mod && k === 'v' && CLIP) { e.preventDefault(); pasteInto(p ? (isDirP(p) ? p : dirName(p)) : S.dir); }
+  else if ((e.key === 'Delete' || (e.key === 'Backspace' && mod)) && p) { e.preventDefault(); deleteItems(itemsFor(p)); }
+  else if (e.key === 'F2' && p) { e.preventDefault(); isDirP(p) ? renameFolder(p) : renameSong(p); }
+});
+
 function addLongPress(el, fn) {
   let timer = 0, moved = false;
-  el.addEventListener('touchstart', () => { moved = false; timer = setTimeout(() => { if (!moved) { el.dataset.lp = '1'; fn(); } }, 550); }, { passive: true });
+  el.addEventListener('touchstart', e => { moved = false; const tt = e.touches[0], pos = { clientX: tt.clientX, clientY: tt.clientY, touch: true }; timer = setTimeout(() => { if (!moved) { el.dataset.lp = '1'; fn(pos); } }, 550); }, { passive: true });
   el.addEventListener('touchmove', () => { moved = true; clearTimeout(timer); }, { passive: true });
   el.addEventListener('touchend', e => { clearTimeout(timer); if (el.dataset.lp) { delete el.dataset.lp; e.preventDefault(); } });
-  el.addEventListener('contextmenu', e => { e.preventDefault(); fn(); });
+  el.addEventListener('contextmenu', e => { e.preventDefault(); fn(e); });
 }
 
 async function newFolder(parent) {
@@ -861,14 +970,15 @@ async function moveFolder(d) {
 }
 
 /** Klasörü kopyala: içerik yeniden yüklenmez (aynı blob), tek commit. */
-async function copyFolder(d) {
-  const target = await pickFolder(t('copyTo', { name: baseName(d) }), null);
+async function copyFolder(d, to) {
+  const target = to !== undefined ? to : await pickFolder(t('copyTo', { name: baseName(d) }), null);
   if (target === null) return;
+  const stay = to !== undefined;
   let nd = (target ? target + '/' : '') + baseName(d);
-  if (nd === d || (S.dirs.has(nd) && countIn(nd))) nd += ' (' + t('copyWord') + ')';
+  if (nd === d || (S.dirs.has(nd) && countIn(nd))) nd = stay ? uniqueDir(target, baseName(d)) : nd + ' (' + t('copyWord') + ')';
   if (nd.startsWith(d + '/')) { toast(t('folderIntoItself')); return; }
   const songs = songsUnder(d);
-  if (!songs.length) { S.virtualDirs.add(nd); await saveVirtualDirs(); rebuildIndex(); goDir(nd); return; }
+  if (!songs.length) { S.virtualDirs.add(nd); await saveVirtualDirs(); rebuildIndex(); if (stay) { openTo(target); keepScroll(renderList); } else goDir(nd); return; }
   const pairs = songs.map(r => [r.p, nd + r.p.slice(d.length)]);
   const changes = pairs.map(([a, b]) => ({ path: 'repertuar/' + b, sha: S.songs.get(a).s, fromP: a }));
   if (!(await commitFolderChange(songs, changes, `Klasör kopyalandı: ${d} → ${nd}`))) return;
@@ -880,11 +990,11 @@ async function copyFolder(d) {
     S.songs.set(b, nr); puts.push(strip(nr));
   }
   await db.putSongs(puts);
-  rebuildIndex(); goDir(nd); scheduleSync(800);
+  rebuildIndex(); if (stay) { openTo(target); keepScroll(renderList); } else goDir(nd); scheduleSync(800);
   toast(t('folderCopied', { n: songs.length }));
 }
 
-async function moveFolderTo(d, nd) {
+async function moveFolderTo(d, nd, stay) {
   if (nd === d) return;
   if (nd.startsWith(d + '/')) { toast(t('folderIntoItself')); return; }
   if (S.dirs.has(nd) && countIn(nd)) { toast(t('folderExists')); return; }
@@ -914,7 +1024,7 @@ async function moveFolderTo(d, nd) {
   remapPaths(new Map(moves));
   if (sameParent) { for (const x of [...openDirs]) if (x === d || x.startsWith(d + '/')) { openDirs.delete(x); openDirs.add(nd + x.slice(d.length)); } try { localStorage.setItem(OPEN_KEY, JSON.stringify([...openDirs])); } catch (_) {} }
   rebuildIndex();
-  if (sameParent) { if (S.dir === d || S.dir.startsWith(d + '/')) S.dir = nd + S.dir.slice(d.length); keepScroll(renderList); } else goDir(nd);
+  if (sameParent || stay) { if (S.dir === d || S.dir.startsWith(d + '/')) S.dir = nd + S.dir.slice(d.length); if (stay) openTo(dirName(nd)); keepScroll(renderList); } else goDir(nd);
   scheduleSync(800);
   toast(t('folderRenamed', { n: songs.length }));
   if (S.current && $('editor').hidden) renderSong();

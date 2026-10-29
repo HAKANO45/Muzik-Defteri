@@ -574,3 +574,18 @@ mark.fix.guess { background: rgba(224,140,40,.25); color: #f0a040; border-bottom
 .org-src { display: flex; gap: 10px; align-items: center; padding: 6px 0 6px 34px; font-size: calc(15px * var(--ui)); }
 .org-src small { display: block; opacity: .65; } .org-src.style { opacity: .85; }
 .org-src input, .org-group .fix-frow input { width: 24px; height: 24px; flex: none; }
+
+/* 📋 kes · kopyala · yapıştır */
+.ctx-menu { position: fixed; z-index: 90; min-width: 270px; background: var(--soft); border: 2px solid var(--gold); border-radius: 16px; padding: 6px; box-shadow: 0 12px 40px rgba(0,0,0,.7); }
+.ctx-menu.touch { left: 12px !important; right: 12px; bottom: 12px; top: auto !important; }
+.ctx-title { padding: 8px 12px; color: var(--gold2); font-weight: 800; font-size: calc(15px * var(--ui)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 420px; }
+.ctx-act { display: flex; justify-content: space-between; align-items: center; gap: 18px; width: 100%; min-height: 52px; padding: 0 14px; border: 0; border-radius: 12px; background: transparent; color: var(--text); font-size: calc(19px * var(--ui)); font-weight: 700; text-align: left; cursor: pointer; }
+.ctx-act:hover:not(:disabled) { background: rgba(212,177,58,.18); }
+.ctx-act:disabled { opacity: .35; }
+.ctx-act small { opacity: .5; font-weight: 400; font-size: 14px; }
+.ctx-act.danger { color: #ff8a8a; }
+.clip-cut { opacity: .45; font-style: italic; }
+.paste-here { margin-left: 8px; min-width: 52px; min-height: 40px; border: 2px solid var(--gold); border-radius: 10px; background: transparent; color: var(--gold2); font-size: 20px; cursor: pointer; flex: none; }
+.clip-bar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; gap: 8px; margin: 10px 6px 6px; padding: 10px 12px; border-radius: 14px; background: var(--gold); color: #111; font-weight: 800; font-size: calc(16px * var(--ui)); box-shadow: 0 -6px 18px rgba(0,0,0,.5); }
+.clip-bar span { flex: 1; min-width: 0; }
+.clip-bar button { min-height: 46px; padding: 0 12px; border: 0; border-radius: 10px; background: #111; color: var(--gold2); font-weight: 800; font-size: calc(16px * var(--ui)); cursor: pointer; }
