@@ -607,3 +607,13 @@ mark.fix.guess { background: rgba(224,140,40,.25); color: #f0a040; border-bottom
 .doc-num input { width: 26px; height: 26px; accent-color: var(--gold); flex: none; }
 .doc-num b { display: block; color: var(--gold2); font-size: calc(17px * var(--ui)); } .doc-num small { display: block; opacity: .7; }
 .doc-list .doc-num { display: flex !important; flex-direction: row; } .doc-num small { font-size: calc(14px * var(--ui)); margin-top: 3px; }
+
+/* ＋☰ programa ekle · tarzlar */
+.prog-pick .item.on { border-color: var(--gold); background: rgba(212,177,58,.16); }
+.prog-pick .item.on .ico { color: var(--gold2); font-weight: 900; }
+.prog-pick-grp { color: var(--gold2); font-weight: 800; margin: 12px 4px 4px; font-size: calc(17px * var(--ui)); }
+.item.prog-in { padding-left: 34px; }
+.prog-grp .name { font-weight: 800; color: var(--gold2); }
+.sheet-act.prog-add { border-color: var(--gold); color: var(--gold2); }
+.prog-tarz { margin: 6px 0 10px; }
+.tarz-new { width: 180px; min-height: 44px; display: inline-block; }

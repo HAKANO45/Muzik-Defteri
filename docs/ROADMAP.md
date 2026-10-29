@@ -158,3 +158,4 @@
 - 5.14.1 — Taşı/Kopyala penceresi: düz uzun liste yerine ana klasörler ağaç gibi (▸ ile içi açılır, ada dokun = seç); arama yazınca düz liste.
 - 5.14.2 — ☑ seçimde klasörler de seçilir (içindeki bütün şarkılarla); birden fazla klasör + şarkı birlikte kopyalanır / taşınır / kesilir / silinir.
 - 5.14.3 — PDF/Word içe aktarma: 'Sıra numarası ekle (01. 02. …)' (varsayılan açık) → şarkılar her cihazda, GitHub'da ve bilgisayar klasöründe PDF sırasıyla; numara listede görünmez.
+- 5.15.0 — ＋☰ Programa ekle: şarkı menüsünde, sağ tık menüsünde ve ☑ seçimde (klasörler dahil); pencere açık kalır, dokun = ekle ✓ / tekrar = çıkar. Programlar tarzlara göre gruplu (Slow, Halay, THM …, kendi tarzın); programın menüsünde 'Tarzını değiştir'.

@@ -8,7 +8,7 @@ import { t, getLang, setLang } from './i18n.js';
 import { SINGERS, NOTES as TON_NOTES, STYLES as TON_STYLES, USULS as TON_USULS, usulOf, tarzOf, normUsul, emptyBook, newId, mergeBooks, parsePasted } from './tonlar.js';
 import { suggest, fixAll, fixName, mostlyUpper, toSentence, tidyBlank, loadGuesser, key as trKey, trLower, trUpper } from './turkce.js';
 
-export const VERSION = '5.14.3';
+export const VERSION = '5.15.0';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -493,6 +493,7 @@ function renderEditBar(head) {
       h('button', { class: 'sel-act', disabled: !n, onclick: () => selOp('copy') }, '⧉ ' + t('copy')),
       h('button', { class: 'sel-act', disabled: !n, onclick: () => selOp('move') }, '➜ ' + t('move')),
       h('button', { class: 'sel-act', disabled: !n, onclick: () => clipSet('cut', [...S.sel]) }, '✂ ' + t('cut')),
+      h('button', { class: 'sel-act', disabled: !n, onclick: () => addToProgramDialog([...new Set([...S.sel].flatMap(p => isDirP(p) ? songsUnder(p).map(r => r.p) : [p]))]) }, '＋☰ ' + t('toProgram')),
       h('button', { class: 'sel-act', disabled: n !== 1, onclick: () => { const p = [...S.sel][0]; isDirP(p) ? renameFolder(p) : renameSong(p); } }, '✎ ' + t('rename')),
       h('button', { class: 'sel-act danger', disabled: !n, onclick: () => deleteItems([...S.sel]) }, '🗑 ' + t('delete')));
     head.append(bar, acts); return;
@@ -509,6 +510,7 @@ function openSongSheetList(p, ctx) {
     h('div', { class: 'sheet-title' }, '♪ ' + showTitle(rec._title)),
     h('div', { class: 'sheet-grid folder-acts' },
       act('📂', t('open'), () => openSong(p, ctx)),
+      act('＋☰', t('addToProgram'), () => addToProgramDialog(p), 'prog-add'),
       act('☑', t('selectTitle'), () => { S.sel = new Set([p]); renderList(); }),
       act('✎', t('rename'), () => renameSong(p)),
       act('⧉', t('copy'), () => filesCopyMove([p], 'copy')),
@@ -671,8 +673,8 @@ function renderList() {
     else head.append(h('span', { class: 'spacer' }),
       progs.length > 1 ? h('button', { class: 'small-btn', title: t('sortTitle'), onclick: () => { S.sortMode = true; renderList(); } }, '↕') : '',
       h('button', { class: 'small-btn', onclick: newProgram }, '＋ ' + t('newProgram')));
-    progs.forEach((p, i) => {
-      const row = h('div', { class: 'item' + (S.sortMode ? ' sorting' : ''), role: 'button', tabindex: 0 },
+    const progRow = (p, i, lvl) => {
+      const row = h('div', { class: 'item' + (S.sortMode ? ' sorting' : '') + (lvl ? ' prog-in' : ''), role: 'button', tabindex: 0 },
         h('span', { class: 'ico' }, '☰'),
         h('span', { class: 'main' }, h('span', { class: 'name' }, p.name)),
         S.sortMode ? h('span', { class: 'acts sort-acts' },
@@ -684,7 +686,24 @@ function renderList() {
         addLongPress(row, () => openProgramSheet(p));   // basılı tut → program menüsü
       }
       list.append(row);
-    });
+    };
+    if (S.sortMode) progs.forEach((p, i) => progRow(p, i, 0));
+    else {
+      // tarz başlıkları altında (dokun → aç/kapa); tarzsızlar en sonda
+      const groups = new Map();
+      for (const p of progs) { const k = p.tarz || ''; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(p); }
+      const keys = [...groups.keys()].sort((a, b) => (a === '') - (b === '') || progTarzList().indexOf(a) - progTarzList().indexOf(b));
+      if (keys.length === 1 && keys[0] === '') progs.forEach((p, i) => progRow(p, i, 0));
+      else for (const k of keys) {
+        const closed = PROG_CLOSED.has(k);
+        const hd = h('div', { class: 'item tree-dir prog-grp' + (closed ? '' : ' open'), role: 'button', tabindex: 0,
+            onclick: () => { closed ? PROG_CLOSED.delete(k) : PROG_CLOSED.add(k); try { localStorage.setItem('md.progClosed', JSON.stringify([...PROG_CLOSED])); } catch (_) {} keepScroll(renderList); } },
+          h('span', { class: 'chev' }, closed ? '▸' : '▾'), h('span', { class: 'ico' }, k ? '🏷' : '📁'),
+          h('span', { class: 'main' }, h('span', { class: 'name' }, k || t('noTarz'))), h('span', { class: 'count' }, t('nPrograms', { n: groups.get(k).length })));
+        list.append(hd);
+        if (!closed) groups.get(k).forEach((p, i) => progRow(p, i, 1));
+      }
+    }
     if (!progs.length) list.append(h('div', { class: 'list-note' }, t('emptyProgram')));
     return;
   }
@@ -768,8 +787,12 @@ function openProgramSheet(pr) {
       act('📂', t('open'), () => { S.programId = pr.id; saveUi(); renderList(); }),
       pr.items.length ? act('▶', t('startStage'), () => { openSong(pr.items[0], { list: pr.items, label: pr.name }); openStage(); }) : null,
       act('✎', t('rename'), () => renameProgram(pr)),
+      act('🏷', t('progTarzChange'), () => {
+        modal(h('h2', {}, '🏷 ' + pr.name), tarzChips(pr.tarz || '', x => { if (x) pr.tarz = x; else delete pr.tarz; touchProgram(pr); }),
+          h('div', { class: 'btn-row' }, h('button', { class: 'btn primary', onclick: closeModal }, t('done'))));
+      }),
       act('⧉', t('copy'), () => {
-        const cp = { id: uid(), name: pr.name + ' (' + t('copyWord') + ')', items: [...pr.items], updated: Date.now() };
+        const cp = { id: uid(), name: pr.name + ' (' + t('copyWord') + ')', items: [...pr.items], updated: Date.now(), ...(pr.tarz ? { tarz: pr.tarz } : {}) };
         S.programs.programs.push(cp); savePrograms(); renderList(); toast(t('saved'));
       }),
       act('🗑', t('delete'), () => deleteProgram(pr), 'danger')),
@@ -842,6 +865,7 @@ function ctxMenu(p, isDir, e) {
     b('✂', t('cut'), 'Ctrl+X', () => clipSet('cut', items)),
     b('⧉', t('copy'), 'Ctrl+C', () => clipSet('copy', items)),
     b('📥', CLIP ? t('pasteInto', { d: target ? baseName(target) : t('root') }) : t('paste'), 'Ctrl+V', () => pasteInto(target), '', !CLIP),
+    !isDir ? b('＋☰', t('addToProgram'), '', () => addToProgramDialog(items.filter(x => S.songs.has(x)))) : null,
     items.length === 1 ? b('✎', t('rename'), 'F2', () => isDir ? renameFolder(p) : renameSong(p)) : null,
     isDir ? b('＋📁', t('newFolderInside'), '', () => newFolder(p)) : null,
     b('🗑', t('delete'), 'Entf', () => deleteItems(items), 'danger'),
@@ -2167,12 +2191,20 @@ function toggleFav(p) {
   savePrograms(); renderSong(); if (S.tab === 'favorites') renderList();
 }
 
-async function newProgram() {
-  const name = await promptText(t('programName'), '');
-  if (!name) return null;
-  const pr = { id: uid(), name, items: [], updated: Date.now() };
+async function newProgram(quiet) {
+  const r = await new Promise(res => {
+    const inp = h('input', { class: 'field', value: '' }); let tarz = '';
+    const ok = () => { const v = inp.value.trim(); closeModal(); res(v ? { name: v, tarz } : null); };
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') ok(); });
+    modal(h('h2', {}, t('programName')), inp, h('label', { class: 'lab' }, '🏷 ' + t('progTarz')), tarzChips('', x => { tarz = x; }),
+      h('div', { class: 'btn-row' }, h('button', { class: 'btn primary', onclick: ok }, 'OK'), h('button', { class: 'btn', onclick: () => { closeModal(); res(null); } }, t('cancel'))));
+    setTimeout(() => inp.focus(), 30);
+  });
+  if (!r) return null;
+  const name = r.name;
+  const pr = { id: uid(), name, items: [], updated: Date.now(), ...(r.tarz ? { tarz: r.tarz } : {}) };
   S.programs.programs.push(pr);
-  savePrograms(); S.programId = pr.id; renderList();
+  savePrograms(); if (!quiet) S.programId = pr.id; renderList();
   return pr;
 }
 async function renameProgram(pr) {
@@ -2200,19 +2232,55 @@ function moveInProgram(pr, i, d) {
   [pr.items[i], pr.items[j]] = [pr.items[j], pr.items[i]];
   touchProgram(pr);
 }
-function addToProgramDialog(p) {
-  const progs = S.programs.programs.filter(x => !x.deleted);
-  const add = pr => {
-    if (!pr.items.includes(p)) pr.items.push(p);
-    pr.updated = Date.now(); savePrograms(); closeModal(); toast(t('addedTo', { name: pr.name }));
-    if (S.tab === 'programs') renderList();
+const PROG_TARZ = ['Slow', 'Halay', 'THM', 'Oyun Havası', 'Roman', 'Düet', 'Arabesk', 'Fantezi', 'Pop'];
+const PROG_CLOSED = (() => { try { return new Set(JSON.parse(localStorage.getItem('md.progClosed') || '[]')); } catch (_) { return new Set(); } })();
+function progTarzList() {
+  return [...new Set([...PROG_TARZ, ...(S.programs.tarzlar || []), ...S.programs.programs.filter(p => !p.deleted && p.tarz).map(p => p.tarz)])];
+}
+/** Tarz seçici (çipler + ＋ yeni tarz). onPick(tarz) — '' = tarzsız */
+function tarzChips(cur, onPick) {
+  const row = h('div', { class: 'chip-row prog-tarz' });
+  const draw = () => row.replaceChildren(
+    ...['', ...progTarzList()].map(x => h('button', { class: 'chip-opt' + (x === cur ? ' on' : ''), onclick: () => { cur = x; onPick(x); draw(); } }, x || t('noTarz'))),
+    h('button', { class: 'chip-opt', onclick: e => {
+      const inp = h('input', { class: 'field tarz-new', placeholder: t('newTarz') });
+      const ok = () => { const nv = inp.value.trim(); if (!nv) { draw(); return; }
+        S.programs.tarzlar = [...new Set([...(S.programs.tarzlar || []), nv])]; S.programs.tarzUpdated = Date.now(); savePrograms();
+        cur = nv; onPick(nv); draw(); };
+      inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); ev.stopPropagation(); ok(); } });
+      e.currentTarget.replaceWith(inp, h('button', { class: 'chip-opt on', onclick: ok }, '✓'));
+      inp.focus();
+    } }, '＋ ' + t('newTarz')));
+  draw(); return row;
+}
+/** Programa ekle: bir ya da birden çok şarkı; programlar tarza göre gruplu; pencere açık kalır, birden çok programa eklenir */
+function addToProgramDialog(paths) {
+  paths = (Array.isArray(paths) ? paths : [paths]).filter(p => S.songs.has(p));
+  if (!paths.length) return;
+  const box = h('div', { class: 'pick-list prog-pick' });
+  const draw = () => {
+    const progs = orderedPrograms(), groups = new Map();
+    for (const p of progs) { const k = p.tarz || ''; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(p); }
+    const keys = [...groups.keys()].sort((a, b) => (a === '') - (b === '') || progTarzList().indexOf(a) - progTarzList().indexOf(b));
+    box.replaceChildren(...keys.flatMap(k => [
+      keys.length > 1 || k ? h('div', { class: 'prog-pick-grp' }, (k ? '🏷 ' + k : '📁 ' + t('noTarz'))) : null,
+      ...groups.get(k).map(pr => {
+        const has = paths.every(p => pr.items.includes(p));
+        return h('button', { class: 'item' + (has ? ' on' : ''), onclick: () => {
+          if (has) pr.items = pr.items.filter(p => !paths.includes(p)); else for (const p of paths) if (!pr.items.includes(p)) pr.items.push(p);
+          pr.updated = Date.now(); savePrograms(); toast(has ? t('removedFrom', { name: pr.name }) : t('addedTo', { name: pr.name }));
+          const sc = box.scrollTop; draw(); box.scrollTop = sc; if (S.tab === 'programs') renderList();
+        } },
+          h('span', { class: 'ico' }, has ? '✓' : '☰'), h('span', { class: 'main' }, h('span', { class: 'name' }, pr.name)), h('span', { class: 'count' }, pr.items.length));
+      })]).filter(Boolean));
   };
-  modal(h('h2', {}, t('addToProgram')),
-    h('div', { class: 'pick-list' }, progs.map(pr => h('button', { class: 'item', onclick: () => add(pr) },
-      h('span', { class: 'ico' }, '☰'), h('span', { class: 'main' }, h('span', { class: 'name' }, pr.name)), h('span', { class: 'count' }, pr.items.length)))),
+  draw();
+  const title = paths.length === 1 ? '♪ ' + showTitle(S.songs.get(paths[0])._title) : t('songs', { n: paths.length });
+  modal(h('div', { class: 'modal-head' }, h('h2', {}, '＋☰ ' + t('addToProgram')), h('button', { class: 'mh-btn', onclick: closeModal }, '✕')),
+    h('p', { class: 'hint' }, title + ' · ' + t('addToProgHint')), box,
     h('div', { class: 'btn-row' },
-      h('button', { class: 'btn primary', onclick: async () => { closeModal(); const pr = await newProgram(); if (pr) add(pr); } }, '＋ ' + t('newProgram')),
-      h('button', { class: 'btn', onclick: closeModal }, t('cancel'))));
+      h('button', { class: 'btn primary', onclick: async () => { const pr = await newProgram(true); if (pr) { for (const p of paths) pr.items.push(p); pr.updated = Date.now(); savePrograms(); toast(t('addedTo', { name: pr.name })); } addToProgramDialog(paths); } }, '＋ ' + t('newProgram')),
+      h('button', { class: 'btn', onclick: closeModal }, t('done'))));
 }
 
 function mergePrograms(local, remote) {
@@ -2223,7 +2291,8 @@ function mergePrograms(local, remote) {
   const fav = (local.favUpdated || 0) >= (remote.favUpdated || 0) ? local.fav : (remote.fav || []);
   const order = (local.orderUpdated || 0) >= (remote.orderUpdated || 0) ? (local.order || []) : (remote.order || []);
   return { format: 1, programs: [...byId.values()], fav, favUpdated: Math.max(local.favUpdated || 0, remote.favUpdated || 0),
-    order, orderUpdated: Math.max(local.orderUpdated || 0, remote.orderUpdated || 0) };
+    order, orderUpdated: Math.max(local.orderUpdated || 0, remote.orderUpdated || 0),
+    tarzlar: [...new Set([...(remote.tarzlar || []), ...(local.tarzlar || [])])], tarzUpdated: Math.max(local.tarzUpdated || 0, remote.tarzUpdated || 0) };
 }
 
 // ------------------------------------------------------------------ senkronizasyon
