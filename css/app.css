@@ -589,3 +589,10 @@ mark.fix.guess { background: rgba(224,140,40,.25); color: #f0a040; border-bottom
 .clip-bar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; gap: 8px; margin: 10px 6px 6px; padding: 10px 12px; border-radius: 14px; background: var(--gold); color: #111; font-weight: 800; font-size: calc(16px * var(--ui)); box-shadow: 0 -6px 18px rgba(0,0,0,.5); }
 .clip-bar span { flex: 1; min-width: 0; }
 .clip-bar button { min-height: 46px; padding: 0 12px; border: 0; border-radius: 10px; background: #111; color: var(--gold2); font-weight: 800; font-size: calc(16px * var(--ui)); cursor: pointer; }
+
+/* klasör seçici: ağaç */
+.pick-row { display: flex; align-items: stretch; gap: 6px; padding-left: calc(var(--lvl, 0) * 26px); }
+.pick-chev { flex: none; width: 54px; min-height: 54px; border: 2px solid var(--gold-dim); border-radius: 12px; background: transparent; color: var(--gold2); font-size: 22px; cursor: pointer; }
+.pick-chev.empty { border: 0; }
+.pick-row .pick-name { flex: 1; min-width: 0; }
+.pick-row .count { margin-left: auto; opacity: .6; padding-left: 10px; }

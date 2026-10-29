@@ -8,7 +8,7 @@ import { t, getLang, setLang } from './i18n.js';
 import { SINGERS, NOTES as TON_NOTES, STYLES as TON_STYLES, USULS as TON_USULS, usulOf, tarzOf, normUsul, emptyBook, newId, mergeBooks, parsePasted } from './tonlar.js';
 import { suggest, fixAll, fixName, mostlyUpper, toSentence, tidyBlank, loadGuesser, key as trKey, trLower, trUpper } from './turkce.js';
 
-export const VERSION = '5.14.0';
+export const VERSION = '5.14.1';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -947,19 +947,36 @@ async function renameFolder(d) {
 
 /** Klasör seçici (iPhone'da yazmadan): aranabilir liste. Kök = ''. */
 function pickFolder(title, exclude) {
+  // Arama boşken: ana klasörler ağaç gibi (▸ ile içi açılır, ada dokun = seç). Arama yazınca: düz liste.
   return new Promise(res => {
-    const all = ['', ...allDirs()].filter(x => !exclude || (x !== exclude && !x.startsWith(exclude + '/')));
+    const ok = x => !exclude || (x !== exclude && !x.startsWith(exclude + '/'));
+    const all = ['', ...allDirs()].filter(ok);
+    const open = new Set();
     const q = h('input', { class: 'field', placeholder: t('search'), autocapitalize: 'off' });
     const box = h('div', { class: 'pick-list folder-pick' });
+    const choose = x => { closeModal(); res(x); };
+    const row = (x, lvl) => {
+      const kids = x === '' ? [] : orderedChildren(x).dirs.filter(ok);
+      const isOpen = open.has(x);
+      return h('div', { class: 'pick-row', style: `--lvl:${lvl}`, 'data-x': x },
+        kids.length ? h('button', { class: 'pick-chev', onclick: () => { const was = isOpen; was ? open.delete(x) : open.add(x); const sc = box.scrollTop; draw(); box.scrollTop = sc; if (!was) { const r = [...box.children].find(c => c.dataset.x === x); if (r) box.scrollTop = r.offsetTop - box.offsetTop - 8; } } }, isOpen ? '▾' : '▸') : h('span', { class: 'pick-chev empty' }),
+        h('button', { class: 'item pick-name', onclick: () => choose(x) },
+          h('span', { class: 'ico' }, x ? (isOpen ? '📂' : '📁') : '⌂'),
+          h('span', { class: 'main' }, h('span', { class: 'name' }, x ? showFolder(baseName(x)) : t('root'))),
+          x ? h('span', { class: 'count' }, countIn(x)) : null));
+    };
+    const tree = (dir, lvl, out) => { for (const d of orderedChildren(dir).dirs.filter(ok)) { out.push(row(d, lvl)); if (open.has(d)) tree(d, lvl + 1, out); } return out; };
     const draw = () => {
       const f = fold(q.value.trim());
-      box.replaceChildren(...all.filter(x => !f || fold(x).includes(f)).slice(0, 200).map(x =>
-        h('button', { class: 'item', onclick: () => { closeModal(); res(x); } },
+      if (!f) { box.replaceChildren(row('', 0), ...tree('', 0, [])); return; }
+      box.replaceChildren(...all.filter(x => fold(x).includes(f)).slice(0, 200).map(x =>
+        h('button', { class: 'item', onclick: () => choose(x) },
           h('span', { class: 'ico' }, x ? '📁' : '⌂'),
           h('span', { class: 'main' }, h('span', { class: 'name' }, x ? baseName(x) : t('root')), x.includes('/') ? h('span', { class: 'sub' }, dirName(x)) : ''))));
     };
     q.addEventListener('input', draw); draw();
-    modal(h('div', { class: 'modal-head' }, h('h2', {}, title), h('button', { class: 'mh-btn', onclick: () => { closeModal(); res(null); } }, '✕')), q, box, h('div', { class: 'btn-row' }, h('button', { class: 'btn', onclick: () => { closeModal(); res(null); } }, t('cancel'))));
+    modal(h('div', { class: 'modal-head' }, h('h2', {}, title), h('button', { class: 'mh-btn', onclick: () => { closeModal(); res(null); } }, '✕')), q,
+      h('p', { class: 'hint' }, t('pickHint')), box, h('div', { class: 'btn-row' }, h('button', { class: 'btn', onclick: () => { closeModal(); res(null); } }, t('cancel'))));
   });
 }
 
