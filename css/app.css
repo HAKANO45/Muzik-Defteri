@@ -596,3 +596,9 @@ mark.fix.guess { background: rgba(224,140,40,.25); color: #f0a040; border-bottom
 .pick-chev.empty { border: 0; }
 .pick-row .pick-name { flex: 1; min-width: 0; }
 .pick-row .count { margin-left: auto; opacity: .6; padding-left: 10px; }
+
+.tree-dir .dir-box { flex: none; margin-right: 6px; cursor: pointer; }
+.tree-dir.selected { background: rgba(212,177,58,.16); }
+.sel-item.via-dir { opacity: .7; }
+.tree-dir .dir-box { width: calc(32px * var(--ui)); height: calc(32px * var(--ui)); border-radius: 8px; border: 2px solid var(--gold-dim); background: transparent; display: inline-flex; align-items: center; justify-content: center; font-weight: 900; color: var(--on-gold); padding: 0; }
+.tree-dir.selected .dir-box { background: var(--gold); border-color: var(--gold); }

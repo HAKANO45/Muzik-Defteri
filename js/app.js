@@ -8,7 +8,7 @@ import { t, getLang, setLang } from './i18n.js';
 import { SINGERS, NOTES as TON_NOTES, STYLES as TON_STYLES, USULS as TON_USULS, usulOf, tarzOf, normUsul, emptyBook, newId, mergeBooks, parsePasted } from './tonlar.js';
 import { suggest, fixAll, fixName, mostlyUpper, toSentence, tidyBlank, loadGuesser, key as trKey, trLower, trUpper } from './turkce.js';
 
-export const VERSION = '5.14.1';
+export const VERSION = '5.14.2';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -388,7 +388,14 @@ function renderTree(list, dir, level) {
       h('span', { class: 'ico' }, open ? '📂' : '📁'),
       h('span', { class: 'main' }, h('span', { class: 'name' }, showFolder(baseName(d)))),
       sorting ? acts(d) : h('span', { class: 'count' }, countIn(d)));
-    if (sorting || S.sel) row.addEventListener('click', e => { if (!e.target.closest('.acts')) toggleDir(d); });
+    if (S.sel && !sorting) {
+      const viaDir = inSelDir(d), on = viaDir || S.sel.has(d);
+      row.classList.toggle('selected', on);
+      row.prepend(h('button', { class: 'sel-box dir-box', onclick: e => { e.stopPropagation(); if (viaDir) return;
+        if (on) S.sel.delete(d); else { S.sel.add(d); for (const x of [...S.sel]) if (x.startsWith(d + '/')) S.sel.delete(x); }
+        keepScroll(renderList); } }, on ? '✓' : ''));
+    }
+    if (sorting || S.sel) row.addEventListener('click', e => { if (!e.target.closest('.acts') && !e.target.closest('.dir-box')) toggleDir(d); });
     else {
       addTaps(row, () => toggleDir(d), () => openFolderSheet(d));
       addLongPress(row, e => VIEW_ONLY ? openFolderSheet(d) : ctxMenu(d, true, e));
@@ -460,10 +467,11 @@ function addTaps(el, single, double) {
   });
 }
 
+const inSelDir = p => [...S.sel].some(x => isDirP(x) && p.startsWith(x + '/'));
 function selectItem(p) {
-  const rec = S.songs.get(p); const on = S.sel.has(p);
-  return h('div', { class: 'item sel-item' + (on ? ' selected' : ''), role: 'button', tabindex: 0,
-      onclick: () => { on ? S.sel.delete(p) : S.sel.add(p); keepScroll(renderList); } },
+  const rec = S.songs.get(p); const viaDir = inSelDir(p), on = viaDir || S.sel.has(p);
+  return h('div', { class: 'item sel-item' + (on ? ' selected' : '') + (viaDir ? ' via-dir' : ''), role: 'button', tabindex: 0,
+      onclick: () => { if (viaDir) return; on ? S.sel.delete(p) : S.sel.add(p); keepScroll(renderList); } },
     h('span', { class: 'sel-box' }, on ? '✓' : ''),
     h('span', { class: 'main' }, h('span', { class: 'name' }, rec ? showTitle(rec._title) : baseName(p))));
 }
@@ -475,16 +483,18 @@ function renderEditBar(head) {
       h('button', { class: 'small-btn', onclick: () => resetOrder(S.dir) }, t('sortAZ')),
       h('button', { class: 'nav-pill', onclick: () => { S.sortMode = false; renderList(); } }, '✓ ' + t('done')));
   } else {
-    const { files } = orderedChildren(S.dir);
-    const n = S.sel.size;
-    bar.append(h('span', { class: 'edit-title' }, t('selectedN', { n })),
-      h('button', { class: 'small-btn', onclick: () => { if (S.sel.size === files.length) S.sel.clear(); else files.forEach(f => S.sel.add(f)); renderList(); } }, t('selectAll')),
+    const { dirs, files } = orderedChildren(S.dir), every = [...dirs, ...files];
+    const n = S.sel.size, nd = [...S.sel].filter(isDirP).length;
+    const songsN = [...S.sel].reduce((a, p) => a + (isDirP(p) ? countIn(p) : 1), 0);
+    bar.append(h('span', { class: 'edit-title' }, nd ? t('selectedMix', { d: nd, n: songsN }) : t('selectedN', { n })),
+      h('button', { class: 'small-btn', onclick: () => { if (every.every(f => S.sel.has(f))) S.sel.clear(); else { S.sel.clear(); every.forEach(f => S.sel.add(f)); } renderList(); } }, t('selectAll')),
       h('button', { class: 'nav-pill', onclick: () => { S.sel = null; renderList(); } }, '✕'));
     const acts = h('div', { class: 'sel-acts' },
-      h('button', { class: 'sel-act', disabled: !n, onclick: () => filesCopyMove([...S.sel], 'copy') }, '⧉ ' + t('copy')),
-      h('button', { class: 'sel-act', disabled: !n, onclick: () => filesCopyMove([...S.sel], 'move') }, '➜ ' + t('move')),
-      h('button', { class: 'sel-act', disabled: n !== 1, onclick: () => renameSong([...S.sel][0]) }, '✎ ' + t('rename')),
-      h('button', { class: 'sel-act danger', disabled: !n, onclick: () => filesDelete([...S.sel]) }, '🗑 ' + t('delete')));
+      h('button', { class: 'sel-act', disabled: !n, onclick: () => selOp('copy') }, '⧉ ' + t('copy')),
+      h('button', { class: 'sel-act', disabled: !n, onclick: () => selOp('move') }, '➜ ' + t('move')),
+      h('button', { class: 'sel-act', disabled: !n, onclick: () => clipSet('cut', [...S.sel]) }, '✂ ' + t('cut')),
+      h('button', { class: 'sel-act', disabled: n !== 1, onclick: () => { const p = [...S.sel][0]; isDirP(p) ? renameFolder(p) : renameSong(p); } }, '✎ ' + t('rename')),
+      h('button', { class: 'sel-act danger', disabled: !n, onclick: () => deleteItems([...S.sel]) }, '🗑 ' + t('delete')));
     head.append(bar, acts); return;
   }
   head.append(bar);
@@ -790,7 +800,22 @@ function clipSet(kind, items) {
 }
 async function pasteInto(target) {
   if (!CLIP || VIEW_ONLY) return;
-  const { kind, items } = CLIP, move = kind === 'cut';
+  await doOp(CLIP.kind === 'cut' ? 'move' : 'copy', CLIP.items, target);
+  if (CLIP && CLIP.kind === 'cut') CLIP = null;
+  openTo(target); keepScroll(renderList);
+}
+/** Seçilenleri (klasör + şarkı) seçilen klasöre kopyala / taşı */
+async function selOp(kind) {
+  const items = [...S.sel]; if (!items.length) return;
+  const one = items.length === 1 ? baseName(items[0]).replace(/\.txt$/i, '') : t('selectedItems', { n: items.length });
+  const target = await pickFolder(t(kind === 'copy' ? 'copyTo' : 'moveTo', { name: one }), items.length === 1 && isDirP(items[0]) ? items[0] : null);
+  if (target === null) return;
+  S.sel = null;
+  await doOp(kind, items, target);
+  openTo(target); keepScroll(renderList);
+}
+async function doOp(kind, items, target) {
+  const move = kind === 'move';
   const songs = items.filter(p => S.songs.has(p)), dirs = items.filter(isDirP);
   for (const d of dirs) {
     if (target === d || target.startsWith(d + '/')) { toast(t('folderIntoItself')); continue; }
@@ -798,13 +823,13 @@ async function pasteInto(target) {
     else await copyFolder(d, target);
   }
   if (songs.length) await filesCopyMove(songs, move ? 'move' : 'copy', target, true);
-  if (move) CLIP = null;
-  openTo(target); keepScroll(renderList);
 }
-function deleteItems(items) {
-  const songs = items.filter(p => S.songs.has(p)), dirs = items.filter(isDirP);
-  if (dirs.length === 1 && !songs.length) return deleteFolder(dirs[0]);
-  if (songs.length) return filesDelete(songs);
+async function deleteItems(items) {
+  const dirs = items.filter(isDirP);
+  const songs = [...new Set([...items.filter(p => S.songs.has(p)), ...dirs.flatMap(d => songsUnder(d).map(r => r.p))])];
+  if (dirs.length === 1 && songs.length === songsUnder(dirs[0]).length) return deleteFolder(dirs[0]);
+  if (songs.length) await filesDelete(songs);
+  if (dirs.length) { for (const v of [...S.virtualDirs]) if (dirs.some(d => v === d || v.startsWith(d + '/'))) S.virtualDirs.delete(v); await saveVirtualDirs(); S.sel = null; rebuildIndex(); renderList(); }
 }
 /** Sağ tık (PC) / basılı tut (dokunmatik): küçük menü, büyük yazılı */
 function ctxMenu(p, isDir, e) {
