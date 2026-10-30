@@ -162,3 +162,4 @@
 - 5.15.1 — ＋☰ Programa ekle düğmesi arama sonuçlarında, favorilerde, son açılanlarda ve program listesinde; sağ tık / basılı tut menüsü bu listelerde de (Programa ekle en üstte). Son açılanlar: satırda ✕ (listeden çıkar) ve 'Listeyi temizle' (şarkılar silinmez).
 - 5.16.0 — 🏷 Not penceresi: Usul (2/4…10/8 + kendi), Ton büyük düğmeler + m, Makam (Hicaz, Uşşak … + kendi), Org kaydı (Ketron), son kullanılan style düğmeleri; usul klasör adından hazır gelir; aramada usul/makam/org da bulunur.
 - 5.17.0 — 📄 Programlar: 'PDF'den program' (her dosyadan PDF sırasıyla bir program, ad + tarz) ve program içinde 'PDF'den ekle'; arşivde aynı adlı şarkı varsa arşivdeki kullanılır (kopya açılmaz, seçilebilir), yoksa yeni dosya.
+- 5.17.1 — Görünüm → 'Not etiketleri': Gizle / Küçük / Orta / Büyük (şarkı başlığı, listeler, sahne). Varsayılan Orta.

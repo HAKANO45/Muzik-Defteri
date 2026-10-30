@@ -8,7 +8,7 @@ import { t, getLang, setLang } from './i18n.js';
 import { SINGERS, NOTES as TON_NOTES, STYLES as TON_STYLES, USULS as TON_USULS, usulOf, tarzOf, normUsul, emptyBook, newId, mergeBooks, parsePasted } from './tonlar.js';
 import { suggest, fixAll, fixName, mostlyUpper, toSentence, tidyBlank, loadGuesser, key as trKey, trLower, trUpper } from './turkce.js';
 
-export const VERSION = '5.17.0';
+export const VERSION = '5.17.1';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -2878,7 +2878,7 @@ function applyLang() {
 }
 
 // ------------------------------------------------------------------ görünüm (tema, düğme boyutu, düzen) — tüm cihazlara senkron
-const LOOK_DEFAULT = { theme: 'gold', ui: 1, meta: true, tags: true, phoneClock: false, font: 22, caseFolder: 'asis', caseSong: 'asis', caseLyrics: 'asis', updated: 0 };
+const LOOK_DEFAULT = { theme: 'gold', ui: 1, meta: true, tags: true, phoneClock: false, noteSize: 'm', font: 22, caseFolder: 'asis', caseSong: 'asis', caseLyrics: 'asis', updated: 0 };
 const THEMES = [
   ['gold', 'themeGold', ['#0b0b0b', '#d4af37', '#f2ead3']],
   ['bw', 'themeBw', ['#000000', '#ffffff', '#8a8a8a']],
@@ -2905,6 +2905,9 @@ function applyLook(L = look()) {
   r.classList.toggle('hide-meta', !L.meta);
   r.classList.toggle('hide-tags', !L.tags);
   r.classList.toggle('show-clock', !!L.phoneClock);
+  // not etiketleri (🎤 solist, 🎵 ton, BPM, usul, makam, style): gizle / küçük / orta / büyük
+  r.style.setProperty('--chipk', { s: 0.65, m: 0.8, l: 1 }[L.noteSize] || 0.8);
+  r.classList.toggle('hide-notechips', L.noteSize === 'off');
   const tc = { gold: '#0b0b0b', bw: '#000000', light: '#fbfaf7', navy: '#0a1020', red: '#0d0606' }[L.theme] || '#0b0b0b';
   const m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', tc);
 }
@@ -2940,6 +2943,7 @@ function openAppearance() {
     h('h3', {}, t('layout')),
     h('label', {}, t('infoLine')), seg([[true, t('show')], [false, t('hide')]], 'meta'),
     h('label', {}, t('tagsLabel')), seg([[true, t('show')], [false, t('hide')]], 'tags'),
+    h('label', {}, t('noteChipsLabel')), seg([['off', t('hide')], ['s', t('sizeS')], ['m', t('sizeMid')], ['l', t('sizeL')]], 'noteSize'),
     h('label', {}, t('phoneTop')), seg([[false, 'HAKANO REPERTUVAR'], [true, t('clockWord')]], 'phoneClock'),
     h('h3', {}, t('caseTitle')),
     h('label', {}, t('caseFolder')), seg([['asis', t('caseAsIs')], ['upper', t('caseUpper')], ['title', t('caseTitleCase')]], 'caseFolder', () => casePrev()),
