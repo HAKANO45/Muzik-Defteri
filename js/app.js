@@ -8,7 +8,7 @@ import { t, getLang, setLang } from './i18n.js';
 import { SINGERS, NOTES as TON_NOTES, STYLES as TON_STYLES, USULS as TON_USULS, usulOf, tarzOf, normUsul, emptyBook, newId, mergeBooks, parsePasted } from './tonlar.js';
 import { suggest, fixAll, fixName, mostlyUpper, toSentence, tidyBlank, loadGuesser, key as trKey, trLower, trUpper } from './turkce.js';
 
-export const VERSION = '5.16.0';
+export const VERSION = '5.17.0';
 const $ = id => document.getElementById(id);
 
 /** iPhone (ve Android telefon) = sadece görüntüleme. Şarkı ekleme/düzenleme/silme/içe aktarma
@@ -721,7 +721,8 @@ function renderList() {
     if (S.sortMode) head.append(doneBar());
     else head.append(h('span', { class: 'spacer' }),
       progs.length > 1 ? h('button', { class: 'small-btn', title: t('sortTitle'), onclick: () => { S.sortMode = true; renderList(); } }, '↕') : '',
-      h('button', { class: 'small-btn', onclick: newProgram }, '＋ ' + t('newProgram')));
+      h('button', { class: 'small-btn', onclick: newProgram }, '＋ ' + t('newProgram')),
+      VIEW_ONLY ? null : h('button', { class: 'small-btn doc-prog-btn', onclick: () => pickDocuments({ mode: 'new' }) }, '📄 ' + t('docProgBtn')));
     const progRow = (p, i, lvl) => {
       const row = h('div', { class: 'item' + (S.sortMode ? ' sorting' : '') + (lvl ? ' prog-in' : ''), role: 'button', tabindex: 0 },
         h('span', { class: 'ico' }, '☰'),
@@ -763,7 +764,8 @@ function renderList() {
     prog.items.length > 1 ? h('button', { class: 'small-btn', title: t('sortTitle'), onclick: () => { S.sortMode = true; renderList(); } }, '↕') : '',
     h('button', { class: 'small-btn', title: t('rename'), onclick: () => renameProgram(prog) }, '✎'),
     h('button', { class: 'small-btn', title: t('delete'), onclick: () => deleteProgram(prog) }, '🗑'),
-    prog.items.length ? h('button', { class: 'small-btn', onclick: () => { openSong(prog.items[0], { list: prog.items, label: prog.name }); openStage(); } }, '▶ ' + t('startStage')) : '');
+    prog.items.length ? h('button', { class: 'small-btn', onclick: () => { openSong(prog.items[0], { list: prog.items, label: prog.name }); openStage(); } }, '▶ ' + t('startStage')) : '',
+    VIEW_ONLY ? '' : h('button', { class: 'small-btn doc-prog-btn', onclick: () => pickDocuments({ mode: 'append', pr: prog }) }, '📄 ' + t('docAppendBtn')));
   const ctx = { list: prog.items, label: prog.name };
   prog.items.forEach((p, i) => {
     if (S.sortMode) {
@@ -2570,13 +2572,14 @@ async function importFiles(fileList, useRelative) {
 }
 
 // ------------------------------------------------------------------ 📄 PDF / Word içe aktar
-function pickDocuments() {
+function pickDocuments(prog) {
   if (VIEW_ONLY) { toast(t('viewOnly')); return; }
   const inp = h('input', { type: 'file', accept: '.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document', multiple: true });
-  inp.onchange = () => { if (inp.files.length) importDocuments([...inp.files]); };
+  inp.onchange = () => { if (inp.files.length) importDocuments([...inp.files], prog); };
   inp.click();
 }
-async function importDocuments(files) {
+/** prog: yok = kütüphane · { mode: 'new' } = her dosyadan bir program · { mode: 'append', pr } = programın sonuna */
+async function importDocuments(files, prog) {
   const bad = files.filter(f => /\.doc$/i.test(f.name));
   if (bad.length) toast(t('docOld'));
   files = files.filter(f => /\.(pdf|docx)$/i.test(f.name));
@@ -2587,14 +2590,22 @@ async function importDocuments(files) {
   for (const f of files) {
     try {
       const r = await parseDocument(f);
-      docs.push({ name: f.name, folder: r.folder, songs: r.songs.map(x => ({ ...x, on: true })) });
+      docs.push({ name: f.name, folder: r.folder, progName: f.name.replace(/\.(pdf|docx)$/i, '').replace(/[_]+/g, ' ').trim(), tarz: '', songs: r.songs.map(x => ({ ...x, on: true })) });
     } catch (e) { console.error(e); toast(f.name + ': ' + t('docFail')); }
   }
   if (!docs.length) return;
-  const exists = title => (S.titleIndex.get(fold(title).replace(/[^a-z0-9]+/g, '')) || []).filter(p => S.songs.has(p) && !S.songs.get(p).del);
+  // başlıktaki "5-8 " gibi usul ve "01." gibi sıra numarası arşiv adıyla eşleşmeyi bozmasın
+  const exists = title => { const k = x => fold(x).replace(/[^a-z0-9]+/g, '');
+    const keys = [...new Set([k(title), k(title.replace(/^\s*\d{1,3}\s*[.)\-_]\s*(?=\D)/, '').replace(/^\s*\d{1,2}\s*[-/]\s*(4|8|16)\s+/, ''))])];
+    return [...new Set(keys.flatMap(x => S.titleIndex.get(x) || []))].filter(p => S.songs.has(p) && !S.songs.get(p).del); };
   const body = h('div', { class: 'doc-list' });
   const count = h('b', {});
-  const recount = () => { const n = docs.reduce((a, d) => a + d.songs.filter(x => x.on).length, 0); count.textContent = t('docSelected', { n }); };
+  const recount = () => {
+    const on = docs.flatMap(d => d.songs.filter(x => x.on)), nu = on.filter(x => x.use).length;
+    count.textContent = prog ? t('docProgCount', { n: on.length, a: on.length - nu, b: nu }) : t('docSelected', { n: on.length });
+  };
+  // arşivdeki kopyalardan en iyisi önce: "(2)" eki yok, Sanatçılar, Türkçe harfli
+  const rank = p => (/\(\d+\)\.txt$/i.test(p) ? 100 : 0) - (p.startsWith('Sanatçılar/') ? 10 : 0) - (/[şğıŞĞİ]/.test((S.songs.get(p) || {}).t || '') ? 5 : 0) + p.split('/').length;
   for (const d of docs) {
     const fIn = h('input', { class: 'field doc-folder', value: d.folder, oninput: () => { d.folder = fIn.value; } });
     const list = h('div', { class: 'doc-songs' }, ...d.songs.map(x => {
@@ -2602,16 +2613,32 @@ async function importDocuments(files) {
       const cb = h('input', { type: 'checkbox', checked: true, onchange: () => { x.on = cb.checked; recount(); } });
       const tIn = h('input', { class: 'doc-title', value: x.title, oninput: () => { x.title = tIn.value; } });
       const prev = h('pre', { class: 'doc-prev', hidden: true }, x.text);
+      // programa aktarırken: arşivde varsa arşivdekini kullan (kopya çoğalmasın)
+      let useRow = null;
+      if (prog) {
+        const opts = [...ex].sort((a, b) => rank(a) - rank(b)).slice(0, 3);
+        x.use = opts[0] || null;
+        useRow = h('div', { class: 'doc-use' });
+        const draw = () => useRow.replaceChildren(
+          ...opts.map(p => h('button', { class: 'doc-opt' + (x.use === p ? ' on' : ''), title: p, onclick: () => { x.use = p; draw(); recount(); } }, (x.use === p ? '✓ ' : '') + t('docUseArchive', { d: dirName(p) || t('root') }),
+            h('small', {}, ((S.songs.get(p) || {}).t || '').split('\n').filter(l => l.trim()).slice(0, 1).join('').slice(0, 60)))),
+          h('button', { class: 'doc-opt' + (!x.use ? ' on' : ''), onclick: () => { x.use = null; draw(); recount(); } }, (!x.use ? '✓ ' : '') + t('docNewFile')));
+        draw();
+      }
       return h('div', { class: 'doc-song' + (ex.length ? ' exists' : '') },
         h('div', { class: 'doc-row' }, cb, tIn,
           ex.length ? h('span', { class: 'doc-badge', title: ex.join('\n') }, t('docExists', { n: ex.length })) : null,
           h('button', { class: 'small-btn', onclick: () => { prev.hidden = !prev.hidden; } }, '👁')),
         h('div', { class: 'doc-first' }, x.text.split('\n').filter(l => l.trim()).slice(0, 2).join(' / ')),
-        prev);
+        useRow, prev);
     }));
+    const pIn = prog && prog.mode === 'new' ? h('input', { class: 'field doc-prog', value: d.progName, oninput: () => { d.progName = pIn.value; } }) : null;
     body.append(h('div', { class: 'doc-file' },
       h('div', { class: 'doc-fname' }, '📄 ' + d.name + ' · ' + t('songs', { n: d.songs.length })),
-      h('label', { class: 'lab' }, '📁 ' + t('folder')), fIn, list));
+      pIn ? h('label', { class: 'lab' }, '☰ ' + t('programName')) : null, pIn,
+      pIn ? h('label', { class: 'lab' }, '🏷 ' + t('progTarz')) : null, pIn ? tarzChips('', x => { d.tarz = x; }) : null,
+      prog && prog.mode === 'append' ? h('div', { class: 'hint' }, '☰ ' + t('docAppendTo', { name: prog.pr.name })) : null,
+      h('label', { class: 'lab' }, '📁 ' + (prog ? t('docNewFolder') : t('folder'))), fIn, list));
   }
   let numbered = true;
   const numCb = h('input', { type: 'checkbox', checked: true, onchange: () => { numbered = numCb.checked; } });
@@ -2626,11 +2653,12 @@ async function importDocuments(files) {
       const dir = d.folder.split('/').map(x => x.replace(/[\\:*?"<>|]/g, '').trim()).filter(Boolean).join('/');
       const total = d.songs.filter(x => x.on).length;
       for (const x of d.songs.filter(x => x.on)) {
+        if (x.use) { x._p = x.use; continue; }                       // arşivdeki şarkı: yeni dosya yok
         let name = x.title.replace(/[\\/:*?"<>|]/g, '').trim(); if (!name) continue;
         if (numbered) name = String(startNo(dir)).padStart(total > 99 ? 3 : 2, '0') + '. ' + name.replace(/^\d{1,3}\s*[.)\-_]\s*(?=\D)/, '');
         let p = (dir ? dir + '/' : '') + name + '.txt', i = 2;
         while ((S.songs.has(p) && !S.songs.get(p).del) || used.has(p)) p = (dir ? dir + '/' : '') + `${name} (${i++}).txt`;
-        used.add(p);
+        used.add(p); x._p = p;
         if (!orders.has(dir)) orders.set(dir, []); orders.get(dir).push(baseName(p));
         const text = x.text.replace(/\r\n?/g, '\n') + '\n';
         const { bytes, enc } = songToBytes({ t: text, e: 'utf8', n: 1 });
@@ -2638,8 +2666,8 @@ async function importDocuments(files) {
         add.push({ p, text, enc, bytes });
       }
     }
-    if (!add.length) return;
-    if (!(await commitFolderChange([], changes, `PDF/Word içe aktarıldı: ${add.length} şarkı (${docs.map(d => d.name).join(', ').slice(0, 120)})`))) return;
+    if (!add.length && !prog) return;
+    if (add.length && !(await commitFolderChange([], changes, `PDF/Word içe aktarıldı: ${add.length} şarkı (${docs.map(d => d.name).join(', ').slice(0, 120)})`))) return;
     const ok = gh().ok, puts = [];
     for (const a of add) {
       const sha = await gitBlobSha(a.bytes);
@@ -2654,6 +2682,24 @@ async function importDocuments(files) {
     }
     saveOrder();
     closeModal(); rebuildIndex();
+    if (prog) {
+      // program(lar): PDF sırasıyla
+      let last = null;
+      for (const d of docs) {
+        const items = d.songs.filter(x => x.on && x._p).map(x => x._p);
+        if (!items.length) continue;
+        if (prog.mode === 'append') { for (const p of items) if (!prog.pr.items.includes(p)) prog.pr.items.push(p); prog.pr.updated = Date.now(); last = prog.pr; }
+        else {
+          const pr = { id: uid(), name: (d.progName || d.name).trim(), items: [...new Set(items)], updated: Date.now(), ...(d.tarz ? { tarz: d.tarz } : {}) };
+          S.programs.programs.push(pr); last = pr;
+        }
+      }
+      savePrograms();
+      if (last) { S.tab = 'programs'; S.programId = last.id; S.sortMode = false; $('q').value = ''; saveUi(); }
+      renderList(); scheduleSync(800);
+      toast(t('docProgSaved', { n: add.length }));
+      return;
+    }
     const first = dirName(add[0].p);
     goDir(first); scheduleSync(800);
     toast(t('docSaved', { n: add.length }));

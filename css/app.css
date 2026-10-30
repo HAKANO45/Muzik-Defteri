@@ -631,3 +631,11 @@ mark.fix.guess { background: rgba(224,140,40,.25); color: #f0a040; border-bottom
 .note-hint { font-size: calc(13px * var(--ui)); opacity: .7; margin-top: -2px; }
 .note-modal label.nl { display: block; color: var(--gold); font-weight: 800; margin: 12px 0 4px; }
 .chip-usul, .chip-makam, .chip-org { border-color: var(--gold-dim); }
+
+/* 📄 PDF'den program */
+.doc-use { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px 34px; }
+.doc-opt { min-height: 42px; padding: 0 12px; border: 2px solid var(--gold-dim); border-radius: 12px; background: transparent; color: var(--text); font-size: calc(14px * var(--ui)); font-weight: 700; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-opt.on { border-color: var(--gold); background: rgba(212,177,58,.18); color: var(--gold2); }
+.doc-prog-btn { border-color: var(--gold); color: var(--gold2); font-weight: 800; }
+.doc-opt small { display: block; font-weight: 400; opacity: .7; font-size: calc(12px * var(--ui)); }
+.doc-opt:has(small) { min-height: 52px; text-align: left; }
